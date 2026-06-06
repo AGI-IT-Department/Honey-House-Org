@@ -151,6 +151,7 @@ interface DashboardData {
 
 export default function App() {
   const [page, setPage] = useState<"dashboard" | "orders" | "batches" | "balance" | "customers">("dashboard");
+  const [menuOpen, setMenuOpen] = useState(false);
   
   // Navigation Tabs
   const [ordersTab, setOrdersTab] = useState<"view" | "create">("view");
@@ -440,6 +441,7 @@ export default function App() {
   // Handle page transitions
   const handlePageChange = (to: typeof page) => {
     setPage(to);
+    setMenuOpen(false); // Close mobile sidebar overlay
     if (to === "dashboard") fetchDashboardData();
     if (to === "orders") fetchOrders();
     if (to === "batches") fetchBatches();
@@ -824,11 +826,22 @@ export default function App() {
         ))}
       </div>
 
-      {/* Persistent Left Sidebar */}
-      <aside className="w-64 bg-white text-slate-700 flex flex-col flex-shrink-0 border-r border-slate-200">
-        <div className="p-6 border-b border-slate-200">
+      {/* Mobile Sidebar backdrop */}
+      {menuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 md:hidden transition-all duration-300"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+
+      {/* Persistent Left Sidebar (Desktop) / Sliding Overlay Sidebar (Mobile) */}
+      <aside className={`
+        fixed inset-y-0 left-0 bg-white text-slate-700 flex flex-col flex-shrink-0 border-r border-slate-200 z-50 w-64 transform transition-transform duration-300 md:static md:translate-x-0
+        ${menuOpen ? "translate-x-0" : "-translate-x-full md:flex"}
+      `}>
+        <div className="p-6 border-b border-slate-200 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20 animate-pulse-slow">
               🍯
             </div>
             <div>
@@ -836,6 +849,12 @@ export default function App() {
               <span className="text-xs text-blue-600 font-semibold tracking-wide uppercase">Core ERP v2</span>
             </div>
           </div>
+          <button 
+            onClick={() => setMenuOpen(false)} 
+            className="md:hidden p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition"
+          >
+            <X className="w-4.5 h-4.5" />
+          </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
@@ -893,7 +912,7 @@ export default function App() {
         {/* Dynamic status footer in drawer */}
         <div className="p-4 border-t border-slate-200 bg-slate-50">
           <div className="flex items-center gap-2">
-            <div className="status-pulse"></div>
+            <div className="status-pulse animate-pulse bg-emerald-500 w-2 h-2 rounded-full"></div>
             <span className="text-xs text-slate-700 font-semibold uppercase tracking-wider">
               Supabase PostgreSQL Live
             </span>
@@ -905,20 +924,31 @@ export default function App() {
       </aside>
 
       {/* Main Workspace Frame */}
-      <main className="flex-1 overflow-y-auto px-10 py-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 overflow-y-auto px-4 md:px-10 py-6 md:py-8 max-w-7xl mx-auto w-full">
         
         {/* App Bar / Header */}
-        <header className="flex justify-between items-center mb-8 pb-4 border-b border-slate-200/60">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight capitalize">
-              {page === "dashboard" ? "Business Intelligence Dashboard" : `${page} modules`}
-            </h2>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              Real-time enterprise metrics for UAE Home Honey. Reconciled Local timezone.
-            </p>
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200/60">
+          <div className="flex items-center gap-3">
+            {/* Hamburger Button on Mobile */}
+            <button 
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="md:hidden p-2 rounded-lg bg-white border border-slate-205 text-slate-700 hover:bg-slate-50 transition focus:ring-2 focus:ring-blue-500/20"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight capitalize">
+                {page === "dashboard" ? "Business Intelligence Dashboard" : `${page} modules`}
+              </h2>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Real-time enterprise metrics for UAE Home Honey. Reconciled Local timezone.
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 self-end md:self-auto">
             <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200/80 px-3 py-1.5 rounded-full font-mono shadow-sm">
               UTC: {new Date().toISOString().split("T")[0]}
             </span>
@@ -1016,25 +1046,27 @@ export default function App() {
               </div>
             </section>
 
-            {/* KPI Cards Panel */}
-            <section className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* KPI Cards Panel - Row 1 */}
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               
-              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between">
+              {/* Total Revenue */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between hover:border-slate-300 transition duration-205">
                 <div>
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Paid Sales</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Revenue</span>
                   <h3 className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
                     {formatAED(dashboard?.totalSales)}
                   </h3>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                  <span className="text-slate-500 font-medium">Reconciled orders</span>
+                  <span className="text-slate-500 font-medium font-sans">From paid orders only</span>
                   <span className="text-emerald-500 font-semibold flex items-center gap-1 font-mono">
                     {dashboard?.paidOrders} approved
                   </span>
                 </div>
               </div>
 
-              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between">
+              {/* Gross Profit */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between hover:border-slate-300 transition duration-205">
                 <div>
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Gross Profit</span>
                   <h3 className="text-2xl font-bold font-mono text-blue-600 tracking-tight">
@@ -1042,16 +1074,17 @@ export default function App() {
                   </h3>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                  <span className="text-slate-500 font-medium">Profit Margin</span>
+                  <span className="text-slate-500 font-medium">Before expenses</span>
                   <span className="text-blue-600 font-bold font-mono bg-blue-50 px-2 py-0.5 rounded-md">
-                    {dashboard?.grossProfitMargin}%
+                    {dashboard?.grossProfitMargin}% margin
                   </span>
                 </div>
               </div>
 
-              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between">
+              {/* Net Profit */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between hover:border-slate-300 transition duration-205">
                 <div>
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Net Cash Profit</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Net Profit</span>
                   <h3 className="text-2xl font-bold font-mono text-emerald-600 tracking-tight">
                     {formatAED(dashboard?.netProfit)}
                   </h3>
@@ -1059,21 +1092,22 @@ export default function App() {
                 <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
                   <span className="text-slate-500 font-medium">After expenses</span>
                   <span className="text-emerald-600 font-bold font-mono bg-emerald-50 px-2 py-0.5 rounded-md">
-                    {dashboard?.netProfitMargin}%
+                    {dashboard?.netProfitMargin}% margin
                   </span>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-6 rounded-2xl text-white flex flex-col justify-between shadow-lg shadow-blue-500/15">
+              {/* Current Balance */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between hover:border-slate-300 transition duration-205">
                 <div>
-                  <span className="text-xs font-bold text-white/75 uppercase tracking-wider block mb-1">Running Balance</span>
-                  <h3 className="text-3xl font-extrabold font-mono tracking-tight text-white">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Current Balance</span>
+                  <h3 className="text-2xl font-bold font-mono text-indigo-600 tracking-tight">
                     {formatAED(dashboard?.currentBalance)}
                   </h3>
                 </div>
-                <div className="mt-4 pt-3 border-t border-white/25 flex justify-between items-center text-xs">
-                  <span className="text-white/80 font-medium">Actual net desk cash</span>
-                  <span className="font-bold underline uppercase font-mono text-white text-[10px]">
+                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
+                  <span className="text-slate-500 font-medium">From Balance Management</span>
+                  <span className="font-bold uppercase font-mono text-indigo-600 text-[10px] bg-indigo-50 px-2 py-0.5 rounded">
                     Reconciled
                   </span>
                 </div>
@@ -1081,50 +1115,75 @@ export default function App() {
 
             </section>
 
-            {/* WEIGHT CARD SUMMARY - PROMINENT REQUIREMENT */}
-            <section className="bg-slate-900 text-slate-150 p-8 rounded-2xl border border-slate-800 shadow-xl flex flex-wrap justify-between items-center gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2.5">
-                  <Scale className="w-5 h-5 text-blue-450" />
-                  <h4 className="text-lg font-bold text-white">Dynamic Stocks & Weights Balance</h4>
+            {/* KPI Cards Panel - Row 2 */}
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              
+              {/* Total Orders */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between hover:border-slate-300 transition duration-205">
+                <div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Orders</span>
+                  <h3 className="text-2xl font-bold font-mono text-slate-950 tracking-tight">
+                    {dashboard?.totalOrders}
+                  </h3>
                 </div>
-                <p className="text-xs text-slate-400 max-w-lg leading-relaxed">
-                  Real-time monitoring of imported weights from Egypt against delivered client orders and registered waste. Available stocks filter represents active stock batches.
-                </p>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
+                  <span className="text-slate-500 font-medium">All orders in filter</span>
+                  <span className="text-slate-600 font-semibold font-mono">
+                    {dashboard?.totalOrders} total
+                  </span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-6 divide-x divide-slate-850">
-                <div className="px-4 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Sold</span>
-                  <span className="text-xl font-bold font-mono text-emerald-400 mt-1 block">
-                    {dashboard?.totalWeightKG.toFixed(2)} <small className="text-xs font-sans text-slate-400">KG</small>
-                  </span>
+              {/* Net Profit Margin */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between hover:border-slate-300 transition duration-205">
+                <div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Net Profit Margin</span>
+                  <h3 className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
+                    {dashboard?.netProfitMargin}%
+                  </h3>
                 </div>
-                <div className="px-4 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Available Stock</span>
-                  <span className="text-xl font-bold font-mono text-blue-400 mt-1 block">
-                    {dashboard?.availableWeightTotal.toFixed(2)} <small className="text-xs font-sans text-slate-400">KG</small>
-                  </span>
-                </div>
-                <div className="px-4 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Wasted & Sample</span>
-                  <span className="text-xl font-bold font-mono text-rose-400 mt-1 block">
-                    {dashboard?.totalWastedAndSamples.toFixed(2)} <small className="text-xs font-sans text-slate-400">KG</small>
-                  </span>
-                </div>
-                <div className="px-4 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Imported</span>
-                  <span className="text-xl font-bold font-mono text-white mt-1 block">
-                    {dashboard?.totalImportedWeight.toFixed(2)} <small className="text-xs font-sans text-slate-400">KG</small>
-                  </span>
-                </div>
-                <div className="px-4 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Waste Over Import</span>
-                  <span className="text-xl font-bold font-mono text-blue-400 mt-1 block">
-                    {dashboard?.wastedMargin}%
+                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
+                  <span className="text-slate-500 font-medium">Net Profit / Revenue</span>
+                  <span className="text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded text-[10px]">
+                    Efficiency
                   </span>
                 </div>
               </div>
+
+              {/* Stock Summary Balance (KG) - spans 2 columns on larger screens */}
+              <div className="lg:col-span-2 bg-gradient-to-br from-violet-600 to-indigo-750 p-6 rounded-2xl text-white shadow-lg flex flex-col justify-between">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider mb-3.5 flex items-center gap-2">
+                    <Scale className="w-4.5 h-4.5 text-indigo-200" />
+                    <span>Stock Summary Balance (KG)</span>
+                  </h4>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs text-indigo-100 font-medium">
+                    <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                      <span>Total Sold Weight:</span>
+                      <span className="font-mono font-bold text-white">{(dashboard?.totalWeightKG || 0).toFixed(2)} KG</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                      <span>Available Stock:</span>
+                      <span className="font-mono font-bold text-white">{(dashboard?.availableWeightTotal || 0).toFixed(2)} KG</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                      <span>Wasted & Free Samples:</span>
+                      <span className="font-mono font-bold text-rose-300">{(dashboard?.totalWastedAndSamples || 0).toFixed(2)} KG</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                      <span>Total Imported Weight:</span>
+                      <span className="font-mono font-bold text-white">{(dashboard?.totalImportedWeight || 0).toFixed(2)} KG</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-2.5 border-t border-white/15 flex justify-between items-center text-xs">
+                  <span className="text-indigo-200 font-medium">Wasted & Sample Ratio:</span>
+                  <span className="font-mono font-bold text-emerald-300 bg-white/15 px-2 py-0.5 rounded-md">
+                    {(dashboard?.wastedMargin || 0).toFixed(1)}% ratio
+                  </span>
+                </div>
+              </div>
+
             </section>
 
             {/* Custom Responsive SVG Charting Engine */}
@@ -2175,7 +2234,7 @@ export default function App() {
                 }`}
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Expense / Distribution</span>
+                <span>Add Expense</span>
               </button>
             </div>
 
@@ -2378,9 +2437,8 @@ export default function App() {
                       onChange={e => setExpType(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs"
                     >
-                      <option value="all">All</option>
+                      <option value="all">All Expenses</option>
                       <option value="Expense">Business Expenses</option>
-                      <option value="Profit Distribution">Profit Distributions</option>
                     </select>
                   </div>
 
@@ -2469,14 +2527,12 @@ export default function App() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Budget Classification</label>
-                    <select
-                      value={newExpense.type}
-                      onChange={e => setNewExpense(prev => ({ ...prev, type: e.target.value, category: "" }))}
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
-                    >
-                      <option value="Expense">Business Expenses</option>
-                      <option value="Profit Distribution">Profit Distributions</option>
-                    </select>
+                    <input
+                      type="text"
+                      value="Business Expenses"
+                      disabled
+                      className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-500 cursor-not-allowed"
+                    />
                   </div>
                 </div>
 
@@ -2490,10 +2546,7 @@ export default function App() {
                       className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:bg-white transition"
                     >
                       <option value="">Select Category</option>
-                      {newExpense.type === "Expense" 
-                        ? expenseCategories.map(c => <option key={c} value={c}>{c}</option>)
-                        : distributionCategories.map(c => <option key={c} value={c}>{c}</option>)
-                      }
+                      {expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
