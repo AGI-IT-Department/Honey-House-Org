@@ -41,9 +41,6 @@ import {
 // Load environment variables
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
