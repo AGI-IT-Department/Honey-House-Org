@@ -1,0 +1,6 @@
+{
+  "name": "Home Honey System",
+  "description": "A modern small business management solution to manage honey import batches, stock weights, multi-item customer orders, expenses, and a running balance sheet ledger.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
