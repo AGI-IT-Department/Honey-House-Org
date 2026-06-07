@@ -263,6 +263,7 @@ export default function App() {
   const [editOrderObj, setEditOrderObj] = useState<OrderItem | null>(null);
   const [editCustomerObj, setEditCustomerObj] = useState<Customer | null>(null);
   const [editBatchId, setEditBatchId] = useState<string | null>(null);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [customerSearchDropdown, setCustomerSearchDropdown] = useState<any[]>([]);
 
   // Available months cache
@@ -632,6 +633,40 @@ export default function App() {
     setIsOrderModalOpen(true);
   };
 
+  const openAddBatchModal = () => {
+    setNewBatch({
+      name: "",
+      egyPhone: "",
+      uaePhone: "",
+      passportNumber: "",
+      locationInEgypt: "",
+      flightDetails: "",
+      arrivalDate: new Date().toISOString().split("T")[0],
+      notes: "",
+      totalWeight: 15.0,
+      products: []
+    });
+    setEditBatchId(null);
+    setIsBatchModalOpen(true);
+  };
+
+  const handleEditBatchClick = (batch: any) => {
+    setNewBatch({
+      name: batch.Name || "",
+      egyPhone: batch["EGY Phone"] || "",
+      uaePhone: batch["UAE Phone"] || "",
+      passportNumber: batch["Passport Number"] || "",
+      locationInEgypt: batch["Location in Egypt"] || "",
+      flightDetails: batch["Flight Dep/Des"] || "",
+      arrivalDate: batch["Arrival Date (UAE)"] || new Date().toISOString().split("T")[0],
+      notes: batch.Notes || "",
+      totalWeight: batch["Total Weight"] || 15.0,
+      products: []
+    });
+    setEditBatchId(batch["Import Batch ID"]);
+    setIsBatchModalOpen(true);
+  };
+
   const handleEditClick = async (clickedItem: OrderItem) => {
     try {
       showToast("Loading order specifications...", "info");
@@ -781,14 +816,21 @@ export default function App() {
     }
 
     try {
-      const res = await fetch("/api/batches", {
-        method: "POST",
+      const url = editBatchId ? `/api/batches/${editBatchId}` : "/api/batches";
+      const method = editBatchId ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newBatch)
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`Import batch ${data.batchId || ""} registered successfully!`, "success");
+        showToast(
+          editBatchId 
+            ? `Import batch ${editBatchId} updated successfully!` 
+            : `Import batch ${data.batchId || ""} registered successfully!`, 
+          "success"
+        );
         setNewBatch({
           name: "",
           egyPhone: "",
@@ -801,6 +843,8 @@ export default function App() {
           totalWeight: 15.0,
           products: []
         });
+        setEditBatchId(null);
+        setIsBatchModalOpen(false);
         setBatchesTab("view");
         fetchBatches();
         fetchDashboardData();
@@ -1124,6 +1168,16 @@ export default function App() {
             <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200/80 px-3 py-1.5 rounded-full font-mono shadow-sm">
               UTC: {new Date().toISOString().split("T")[0]}
             </span>
+            {page === "batches" && (
+              <button
+                onClick={openAddBatchModal}
+                className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-amber-500/10"
+                title="Log a new stock import batch"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Batch</span>
+              </button>
+            )}
             <button
               onClick={openAddOrderModal}
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-blue-500/10"
@@ -1669,21 +1723,9 @@ export default function App() {
             
             <div className="flex border-b border-slate-200">
               <button
-                onClick={() => setBatchesTab("view")}
-                className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
-                  batchesTab === "view" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"
-                }`}
+                className="px-6 py-3 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 transition"
               >
                 Stock Batches list
-              </button>
-              <button
-                onClick={() => setBatchesTab("create")}
-                className={`px-6 py-3 font-semibold text-sm border-b-2 transition flex items-center gap-2 ${
-                  batchesTab === "create" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"
-                }`}
-              >
-                <Plus className="w-4 h-4" />
-                <span>Log New Import Batch</span>
               </button>
             </div>
 
@@ -1770,6 +1812,13 @@ export default function App() {
 
                         <div className="flex items-center gap-2">
                           <button
+                            onClick={() => handleEditBatchClick(batch)}
+                            className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/50 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Edit Batch</span>
+                          </button>
+                          <button
                             onClick={() => handleDeleteBatch(batch["Import Batch ID"])}
                             className="bg-rose-50 text-rose-600 hover:bg-rose-105 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
                           >
@@ -1847,151 +1896,7 @@ export default function App() {
               </div>
             )}
 
-            {/* Sub-tab 2: LOG NEW IMPORT BATCH */}
-            {batchesTab === "create" && (
-              <form onSubmit={saveBatch} className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6 max-w-4xl">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-                    <Plus className="w-5 h-5 text-blue-600" />
-                    <span>Import Batch Flight Metadata</span>
-                  </h3>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Carrier Name *</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Bassam Mohamed"
-                      value={newBatch.name}
-                      onChange={e => setNewBatch(prev => ({ ...prev, name: e.target.value }))}
-                      required
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">EGY Contact Phone</label>
-                    <input
-                      type="text"
-                      value={newBatch.egyPhone}
-                      onChange={e => setNewBatch(prev => ({ ...prev, egyPhone: e.target.value }))}
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono focus:bg-white transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">UAE Contact Phone *</label>
-                    <input
-                      type="text"
-                      value={newBatch.uaePhone}
-                      onChange={e => setNewBatch(prev => ({ ...prev, uaePhone: e.target.value }))}
-                      required
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-semibold focus:bg-white transition"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Passport Number</label>
-                    <input
-                      type="text"
-                      value={newBatch.passportNumber}
-                      onChange={e => setNewBatch(prev => ({ ...prev, passportNumber: e.target.value }))}
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Location in Egypt</label>
-                    <input
-                      type="text"
-                      value={newBatch.locationInEgypt}
-                      onChange={e => setNewBatch(prev => ({ ...prev, locationInEgypt: e.target.value }))}
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Carrier Flight Details</label>
-                    <input
-                      type="text"
-                      value={newBatch.flightDetails}
-                      onChange={e => setNewBatch(prev => ({ ...prev, flightDetails: e.target.value }))}
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Arrival Date (UAE) *</label>
-                    <input
-                      type="date"
-                      value={newBatch.arrivalDate}
-                      onChange={e => setNewBatch(prev => ({ ...prev, arrivalDate: e.target.value }))}
-                      required
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-5 border-t border-slate-100">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-                      <Scale className="w-4 h-4 text-amber-500" />
-                      <span>Batch Total Weight (KG) *</span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      placeholder="e.g. 15.0"
-                      value={newBatch.totalWeight}
-                      onChange={e => setNewBatch(prev => ({ ...prev, totalWeight: parseFloat(e.target.value) || 0 }))}
-                      className="w-full bg-blue-50/30 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1 font-medium">
-                      All products catalog items will automatically be credited for this batch. Orders will deduct available stock weights dynamically.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-500 uppercase">Carrier Notes / Freight References</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Batch transit tracking notes, flight logs..."
-                    value={newBatch.notes}
-                    onChange={e => setNewBatch(prev => ({ ...prev, notes: e.target.value }))}
-                    className="w-full bg-[#fafaf9] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-700"
-                  />
-                </div>
-
-                <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewBatch({
-                        name: "",
-                        egyPhone: "",
-                        uaePhone: "",
-                        passportNumber: "",
-                        locationInEgypt: "",
-                        flightDetails: "",
-                        arrivalDate: new Date().toISOString().split("T")[0],
-                        notes: "",
-                        products: [{ productName: "Honey 1kg", quantity: 10, purchasePrice: 10, shippingCost: 5, localCost: 2 }]
-                      });
-                      setBatchesTab("view");
-                    }}
-                    className="bg-slate-105 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
-                  >
-                    Cancel Draft
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-blue-600 text-white hover:bg-blue-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition"
-                  >
-                    Save Stock Batch
-                  </button>
-                </div>
-              </form>
-            )}
 
           </div>
         )}
@@ -3123,6 +3028,169 @@ export default function App() {
                 className="bg-blue-600 text-white hover:bg-blue-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition"
               >
                 {editingOrderId ? "Update & Save Order" : "Book Order Transaction"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal - BATCH CREATION & EDITING Overlay */}
+      {isBatchModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in py-10 px-4">
+          <form 
+            onSubmit={saveBatch} 
+            className="bg-white p-8 rounded-2xl border border-slate-200 w-full max-w-4xl shadow-2xl space-y-6 animate-scale-up max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
+                <Boxes className="w-5 h-5 text-amber-500" />
+                <span>{editBatchId ? `Edit Stock Import Batch [${editBatchId}]` : "Log New Stock Import Batch"}</span>
+              </span>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setIsBatchModalOpen(false);
+                  setEditBatchId(null);
+                }} 
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Carrier Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bassam Mohamed"
+                  value={newBatch.name}
+                  onChange={e => setNewBatch(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                  className="w-full bg-slate-50/55 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">EGY Contact Phone</label>
+                <input
+                  type="text"
+                  value={newBatch.egyPhone}
+                  onChange={e => setNewBatch(prev => ({ ...prev, egyPhone: e.target.value }))}
+                  className="w-full bg-slate-50/55 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono focus:bg-white transition text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">UAE Contact Phone *</label>
+                <input
+                  type="text"
+                  value={newBatch.uaePhone}
+                  onChange={e => setNewBatch(prev => ({ ...prev, uaePhone: e.target.value }))}
+                  required
+                  className="w-full bg-slate-50/55 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-semibold focus:bg-white transition text-slate-800"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Passport Number</label>
+                <input
+                  type="text"
+                  value={newBatch.passportNumber}
+                  onChange={e => setNewBatch(prev => ({ ...prev, passportNumber: e.target.value }))}
+                  className="w-full bg-slate-50/55 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:bg-white transition"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Location in Egypt</label>
+                <input
+                  type="text"
+                  value={newBatch.locationInEgypt}
+                  onChange={e => setNewBatch(prev => ({ ...prev, locationInEgypt: e.target.value }))}
+                  className="w-full bg-slate-50/55 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:bg-white transition"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Carrier Flight Details</label>
+                <input
+                  type="text"
+                  value={newBatch.flightDetails}
+                  onChange={e => setNewBatch(prev => ({ ...prev, flightDetails: e.target.value }))}
+                  className="w-full bg-slate-50/55 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:bg-white transition"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Arrival Date (UAE) *</label>
+                <input
+                  type="date"
+                  value={newBatch.arrivalDate}
+                  onChange={e => setNewBatch(prev => ({ ...prev, arrivalDate: e.target.value }))}
+                  required
+                  className="w-full bg-slate-50/55 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:bg-white transition"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-5 border-t border-slate-100">
+              <div>
+                <label className="block text-xs font-bold text-slate-705 uppercase mb-1.5 flex items-center gap-1.5">
+                  <Scale className="w-4 h-4 text-amber-550" />
+                  <span>Batch Total Weight (KG) *</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  placeholder="e.g. 15.0"
+                  value={newBatch.totalWeight}
+                  onChange={e => setNewBatch(prev => ({ ...prev, totalWeight: parseFloat(e.target.value) || 0 }))}
+                  className="w-full bg-blue-50/30 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition text-slate-800"
+                />
+                <p className="text-[10px] text-slate-500 mt-1 font-medium">
+                  All products catalog items will automatically be credited for this batch. Orders will deduct available stock weights dynamically.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase">Carrier Notes / Freight References</label>
+              <textarea
+                rows={3}
+                placeholder="Batch transit tracking notes, flight logs..."
+                value={newBatch.notes}
+                onChange={e => setNewBatch(prev => ({ ...prev, notes: e.target.value }))}
+                className="w-full bg-[#fafaf9] border border-slate-205 rounded-xl px-4 py-2.5 text-xs text-slate-700"
+              />
+            </div>
+
+            <div className="pt-6 border-t border-slate-100 flex justify-end gap-3 font-sans">
+              <button
+                type="button"
+                onClick={() => {
+                  setNewBatch({
+                    name: "",
+                    egyPhone: "",
+                    uaePhone: "",
+                    passportNumber: "",
+                    locationInEgypt: "",
+                    flightDetails: "",
+                    arrivalDate: new Date().toISOString().split("T")[0],
+                    notes: "",
+                    totalWeight: 15.0,
+                    products: []
+                  });
+                  setEditBatchId(null);
+                  setIsBatchModalOpen(false);
+                }}
+                className="bg-slate-105 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white hover:bg-blue-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition"
+              >
+                {editBatchId ? "Update Stock Batch" : "Save Stock Batch"}
               </button>
             </div>
           </form>
