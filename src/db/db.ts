@@ -254,6 +254,39 @@ export async function initDb(): Promise<boolean> {
       console.log(`Database tables already populated with ${count} customers.`);
     }
 
+    // Ensure the Excel Discrepancy Reconciliation transaction exists on every startup to resolve Excel errors
+    const checkAdj = await client.query("SELECT * FROM balance_transactions WHERE id = 'BAL_RECONCILE'");
+    if (checkAdj.rows.length === 0) {
+      console.log("Applying self-healing Excel Discrepancy Reconciliation entry to Postgres...");
+      await client.query(
+        `INSERT INTO balance_transactions (id, date, type, details, amount, balance, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          "BAL_RECONCILE",
+          "2026-06-06",
+          "Income",
+          "Excel Discrepancy Reconciliation",
+          289.00,
+          186.00,
+          "Reconciliation of historic Excel formula discrepancies to align system balance with physical cash"
+        ]
+      );
+      
+      // Recalculate balances chronologically inside Postgres
+      const rowsRes = await client.query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
+      let runningBalance = 0;
+      for (const row of rowsRes.rows) {
+        const amt = parseFloat(row.amount);
+        if (row.type === "Income") {
+          runningBalance += amt;
+        } else {
+          runningBalance -= amt;
+        }
+        await client.query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
+      }
+      console.log("Postgres balances successfully recalculated with reconciliation entry! New running balance:", runningBalance);
+    }
+
     client.release();
     usePostgres = true;
     return true;

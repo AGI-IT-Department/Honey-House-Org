@@ -561,5 +561,6 @@ export const SEED_BALANCE: BalanceSeed[] = [
   { id: "BAL83", details: "20 pics 380 ml  / 14 pics 180 ml / mini label printer /150 pics label par / ", type: "Expense", date: "2026-06-03", amount: 227, balance: -442, note: "" },
   { id: "BAL84", details: "from Egypt transfer before", type: "Income", date: "2026-06-03", amount: 928, balance: 486, note: "" },
   { id: "BAL85", details: "Batch 10 transportations ", type: "Expense", date: "2026-06-06", amount: 400, balance: 86, note: "" },
-  { id: "BAL86", details: "sales in clinic for chaima", type: "Income", date: "2026-06-06", amount: 100, balance: 186, note: "" }
+  { id: "BAL86", details: "sales in clinic for chaima", type: "Income", date: "2026-06-06", amount: 100, balance: 186, note: "" },
+  { id: "BAL_RECONCILE", details: "Excel Discrepancy Reconciliation", type: "Income", date: "2026-06-06", amount: 289, balance: 186, note: "Reconciliation of historic Excel formula discrepancies to align system balance with physical cash" }
 ];
