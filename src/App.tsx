@@ -2549,349 +2549,7 @@ export default function App() {
               </table>
             </div>
 
-            {/* Modal - CUSTOMER PROFILE EDIT Overlay */}
-            {editCustomerObj && (
-              <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in">
-                <form onSubmit={saveCustomerChanges} className="bg-white p-8 rounded-2xl border border-slate-200 w-full max-w-md shadow-2xl space-y-5 animate-scale-up">
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                    <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
-                      <Users className="w-5 h-5 text-blue-500" />
-                      <span>Edit Customer Profile</span>
-                    </span>
-                    <button type="button" onClick={() => setEditCustomerObj(null)} className="text-slate-400 hover:text-slate-600">
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Customer Identifier</label>
-                      <input
-                        type="text"
-                        value={editCustomerObj["Customer ID"]}
-                        disabled
-                        className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-2 text-xs font-mono font-bold text-slate-500 cursor-not-allowed"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Client Name *</label>
-                      <input
-                        type="text"
-                        value={editCustomerObj["Customer Name"]}
-                        onChange={e => setEditCustomerObj(prev => prev ? { ...prev, "Customer Name": e.target.value } : null)}
-                        required
-                        className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contact Phone *</label>
-                      <input
-                        type="text"
-                        value={editCustomerObj["Customer Phone"]}
-                        onChange={e => setEditCustomerObj(prev => prev ? { ...prev, "Customer Phone": e.target.value } : null)}
-                        required
-                        className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs font-mono font-semibold focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Emirates Location *</label>
-                      <select
-                        value={editCustomerObj["Customer Location"]}
-                        onChange={e => setEditCustomerObj(prev => prev ? { ...prev, "Customer Location": e.target.value } : null)}
-                        required
-                        className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs font-semibold"
-                      >
-                        <option value="Dubai">Dubai</option>
-                        <option value="Sharjah">Sharjah</option>
-                        <option value="Ajman">Ajman</option>
-                        <option value="Abu Dhabi">Abu Dhabi</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100 flex justify-end gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setEditCustomerObj(null)}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold transition"
-                    >
-                      Discard
-                    </button>
-                    <button
-                      type="submit"
-                      className="bg-blue-600 text-white hover:bg-blue-700 px-5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Modal - UNIFIED ORDER CREATION & EDITING Overlay */}
-            {isOrderModalOpen && (
-              <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in py-10">
-                <form 
-                  onSubmit={saveOrder} 
-                  className="bg-white p-8 rounded-2xl border border-slate-200 w-full max-w-4xl shadow-2xl space-y-6 animate-scale-up max-h-[90vh] overflow-y-auto"
-                >
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                    <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
-                      <ShoppingBag className="w-5 h-5 text-blue-600" />
-                      <span>{editingOrderId ? `Edit Customer Order [${editingOrderId}]` : "Create New Customer Order"}</span>
-                    </span>
-                    <button 
-                      type="button" 
-                      onClick={() => {
-                        setIsOrderModalOpen(false);
-                        setEditingOrderId(null);
-                      }} 
-                      className="text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {/* Customer Details Summary */}
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Customer Details Summary</h3>
-                    
-                    {!editingOrderId && (
-                      <div className="mb-4">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Search Roster Customers</label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search className="w-4 h-4 text-slate-400" />
-                          </div>
-                          <input
-                            type="text"
-                            placeholder="Filter database by name or phone to autofill..."
-                            value={customerSearchQuery}
-                            onChange={e => {
-                              setCustomerSearchQuery(e.target.value);
-                              handleCustomerSearchType(e.target.value);
-                            }}
-                            className="w-full bg-[#fafaf9] border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:bg-white transition"
-                          />
-                          {customerSearchDropdown.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl mt-1.5 overflow-hidden z-25 max-h-56 overflow-y-auto font-sans">
-                              {customerSearchDropdown.map((c, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => selectSuggestedCustomer(c)}
-                                  className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 text-xs flex justify-between items-center transition"
-                                >
-                                  <div>
-                                    <p className="font-bold text-slate-950">{c["Customer Name"]}</p>
-                                    <p className="text-[10px] text-slate-500 font-mono">{c["Customer Phone"]}</p>
-                                  </div>
-                                  <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-bold uppercase font-mono">Select</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Client Full Name *</label>
-                        <input
-                          type="text"
-                          value={newOrder.customerName}
-                          onChange={e => handleNewOrderChange("customerName", e.target.value)}
-                          required
-                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contact Phone *</label>
-                        <input
-                          type="text"
-                          value={newOrder.customerPhone}
-                          onChange={e => handleNewOrderChange("customerPhone", e.target.value)}
-                          required
-                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-semibold focus:bg-white transition"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Emirates Location *</label>
-                        <select
-                          value={newOrder.customerLocation}
-                          onChange={e => handleNewOrderChange("customerLocation", e.target.value)}
-                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
-                        >
-                          <option value="Dubai">Dubai</option>
-                          <option value="Sharjah">Sharjah</option>
-                          <option value="Ajman">Ajman</option>
-                          <option value="Abu Dhabi">Abu Dhabi</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Order Date *</label>
-                        <input
-                          type="date"
-                          value={newOrder.orderDate}
-                          onChange={e => handleNewOrderChange("orderDate", e.target.value)}
-                          required
-                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Delivery Status</label>
-                        <select
-                          value={newOrder.deliveryStatus}
-                          onChange={e => handleNewOrderChange("deliveryStatus", e.target.value)}
-                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Delivered">Delivered</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Payment Status</label>
-                        <select
-                          value={newOrder.paymentStatus}
-                          onChange={e => handleNewOrderChange("paymentStatus", e.target.value)}
-                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
-                        >
-                          <option value="Unpaid">Unpaid</option>
-                          <option value="Paid">Paid</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Items to Purchase Section */}
-                  <div className="pt-4 border-t border-slate-100 font-sans">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
-                      <span>Items to purchase</span>
-                    </h3>
-
-                    <div className="space-y-4">
-                      {newOrder.products.map((item, index) => {
-                        const avOptions: any[] = (item as any).availableProductsOptions || [];
-                        const activeBatches = batchIdsWithStatus.filter(b => 
-                          b.availableWeight > 0 || item.batchId === b.batchId
-                        );
-
-                        return (
-                          <div key={index} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/30 grid grid-cols-1 md:grid-cols-5 gap-3 items-end relative">
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Batch ID *</label>
-                              <select
-                                value={item.batchId}
-                                onChange={e => handleProductRowChange(index, "batchId", e.target.value)}
-                                required
-                                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
-                              >
-                                <option value="">Select Batch</option>
-                                {activeBatches.map(b => (
-                                  <option key={b.batchId} value={b.batchId}>
-                                    {b.batchId} ({b.availableWeight.toFixed(1)} KG av.)
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Product *</label>
-                              <select
-                                value={item.productName}
-                                onChange={e => handleProductRowChange(index, "productName", e.target.value)}
-                                required
-                                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
-                              >
-                                <option value="">Select product</option>
-                                {avOptions.map((opt, i) => (
-                                  <option key={i} value={opt.product}>
-                                    {opt.product} ({opt.availableQuantity} units av.)
-                                  </option>
-                                ))}
-                              </select>
-                              {item.costPrice > 0 && (
-                                <p className="text-[9px] text-emerald-600 font-bold mt-1.5 font-mono bg-emerald-50 px-1 py-0.5 rounded border border-emerald-150 inline-block">
-                                  Unit Cost: {formatAED(item.costPrice)}
-                                </p>
-                              )}
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Quantity *</label>
-                              <input
-                                type="number"
-                                min={1}
-                                max={item.availableQuantity || 9999}
-                                value={item.quantity}
-                                onChange={e => handleProductRowChange(index, "quantity", parseInt(e.target.value) || 1)}
-                                required
-                                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-blue-500"
-                              />
-                              {item.availableQuantity > 0 && (
-                                <p className="text-[9px] text-blue-600 font-bold mt-0.5">Max allowed: {item.availableQuantity}</p>
-                              )}
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Selling Price *</label>
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={item.unitPrice}
-                                  onChange={e => handleProductRowChange(index, "unitPrice", parseFloat(e.target.value) || 0)}
-                                  required
-                                  className="w-full bg-white border border-slate-200 rounded-lg pl-2.5 pr-8 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-blue-500"
-                                />
-                                <span className="absolute inset-y-0 right-2 flex items-center text-[9px] text-slate-400 font-bold">AED</span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1">
-                                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Cost</span>
-                                <span className="text-xs font-bold font-mono text-slate-500 block py-1.5 px-0.5">
-                                  {formatAED(item.quantity * item.unitPrice)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="pt-6 border-t border-slate-100 flex justify-end gap-3 font-sans">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsOrderModalOpen(false);
-                        setEditingOrderId(null);
-                      }}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
-                    >
-                      Cancel Draft
-                    </button>
-                    <button
-                      type="submit"
-                      className="bg-blue-600 text-white hover:bg-blue-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition"
-                    >
-                      {editingOrderId ? "Update & Save Order" : "Book Order Transaction"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
+            {/* Modals are registered globally at the bottom of main */}
 
           </div>
         )}
@@ -3161,6 +2819,350 @@ export default function App() {
 
           </div>
         )}
+
+      {/* Modal - CUSTOMER PROFILE EDIT Overlay */}
+      {editCustomerObj && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in">
+          <form onSubmit={saveCustomerChanges} className="bg-white p-8 rounded-2xl border border-slate-200 w-full max-w-md shadow-2xl space-y-5 animate-scale-up">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
+                <Users className="w-5 h-5 text-blue-500" />
+                <span>Edit Customer Profile</span>
+              </span>
+              <button type="button" onClick={() => setEditCustomerObj(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Customer Identifier</label>
+                <input
+                  type="text"
+                  value={editCustomerObj["Customer ID"]}
+                  disabled
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-2 text-xs font-mono font-bold text-slate-500 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Client Name *</label>
+                <input
+                  type="text"
+                  value={editCustomerObj["Customer Name"]}
+                  onChange={e => setEditCustomerObj(prev => prev ? { ...prev, "Customer Name": e.target.value } : null)}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contact Phone *</label>
+                <input
+                  type="text"
+                  value={editCustomerObj["Customer Phone"]}
+                  onChange={e => setEditCustomerObj(prev => prev ? { ...prev, "Customer Phone": e.target.value } : null)}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs font-mono font-semibold focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Emirates Location *</label>
+                <select
+                  value={editCustomerObj["Customer Location"]}
+                  onChange={e => setEditCustomerObj(prev => prev ? { ...prev, "Customer Location": e.target.value } : null)}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs font-semibold"
+                >
+                  <option value="Dubai">Dubai</option>
+                  <option value="Sharjah">Sharjah</option>
+                  <option value="Ajman">Ajman</option>
+                  <option value="Abu Dhabi">Abu Dhabi</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setEditCustomerObj(null)}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold transition"
+              >
+                Discard
+              </button>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white hover:bg-blue-700 px-5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
+              >
+                Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal - UNIFIED ORDER CREATION & EDITING Overlay */}
+      {isOrderModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in py-10">
+          <form 
+            onSubmit={saveOrder} 
+            className="bg-white p-8 rounded-2xl border border-slate-200 w-full max-w-4xl shadow-2xl space-y-6 animate-scale-up max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
+                <ShoppingBag className="w-5 h-5 text-blue-600" />
+                <span>{editingOrderId ? `Edit Customer Order [${editingOrderId}]` : "Create New Customer Order"}</span>
+              </span>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setIsOrderModalOpen(false);
+                  setEditingOrderId(null);
+                }} 
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Customer Details Summary */}
+            <div>
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Customer Details Summary</h3>
+              
+              {!editingOrderId && (
+                <div className="mb-4">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Search Roster Customers</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Filter database by name or phone to autofill..."
+                      value={customerSearchQuery}
+                      onChange={e => {
+                        setCustomerSearchQuery(e.target.value);
+                        handleCustomerSearchType(e.target.value);
+                      }}
+                      className="w-full bg-[#fafaf9] border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:bg-white transition"
+                    />
+                    {customerSearchDropdown.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl mt-1.5 overflow-hidden z-25 max-h-56 overflow-y-auto font-sans">
+                        {customerSearchDropdown.map((c, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => selectSuggestedCustomer(c)}
+                            className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 text-xs flex justify-between items-center transition"
+                          >
+                            <div>
+                              <p className="font-bold text-slate-950">{c["Customer Name"]}</p>
+                              <p className="text-[10px] text-slate-500 font-mono">{c["Customer Phone"]}</p>
+                            </div>
+                            <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-bold uppercase font-mono">Select</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Client Full Name *</label>
+                  <input
+                    type="text"
+                    value={newOrder.customerName}
+                    onChange={e => handleNewOrderChange("customerName", e.target.value)}
+                    required
+                    className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contact Phone *</label>
+                  <input
+                    type="text"
+                    value={newOrder.customerPhone}
+                    onChange={e => handleNewOrderChange("customerPhone", e.target.value)}
+                    required
+                    className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-semibold focus:bg-white transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Emirates Location *</label>
+                  <select
+                    value={newOrder.customerLocation}
+                    onChange={e => handleNewOrderChange("customerLocation", e.target.value)}
+                    className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
+                  >
+                    <option value="Dubai">Dubai</option>
+                    <option value="Sharjah">Sharjah</option>
+                    <option value="Ajman">Ajman</option>
+                    <option value="Abu Dhabi">Abu Dhabi</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Order Date *</label>
+                  <input
+                    type="date"
+                    value={newOrder.orderDate}
+                    onChange={e => handleNewOrderChange("orderDate", e.target.value)}
+                    required
+                    className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Delivery Status</label>
+                  <select
+                    value={newOrder.deliveryStatus}
+                    onChange={e => handleNewOrderChange("deliveryStatus", e.target.value)}
+                    className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Delivered">Delivered</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Payment Status</label>
+                  <select
+                    value={newOrder.paymentStatus}
+                    onChange={e => handleNewOrderChange("paymentStatus", e.target.value)}
+                    className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
+                  >
+                    <option value="Unpaid">Unpaid</option>
+                    <option value="Paid">Paid</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Items to Purchase Section */}
+            <div className="pt-4 border-t border-slate-100 font-sans">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
+                <span>Items to purchase</span>
+              </h3>
+
+              <div className="space-y-4">
+                {newOrder.products.map((item, index) => {
+                  const avOptions: any[] = (item as any).availableProductsOptions || [];
+                  const activeBatches = batchIdsWithStatus.filter(b => 
+                    b.availableWeight > 0 || item.batchId === b.batchId
+                  );
+
+                  return (
+                    <div key={index} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/30 grid grid-cols-1 md:grid-cols-5 gap-3 items-end relative">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Batch ID *</label>
+                        <select
+                          value={item.batchId}
+                          onChange={e => handleProductRowChange(index, "batchId", e.target.value)}
+                          required
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="">Select Batch</option>
+                          {activeBatches.map(b => (
+                            <option key={b.batchId} value={b.batchId}>
+                              {b.batchId} ({b.availableWeight.toFixed(1)} KG av.)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Product *</label>
+                        <select
+                          value={item.productName}
+                          onChange={e => handleProductRowChange(index, "productName", e.target.value)}
+                          required
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="">Select product</option>
+                          {avOptions.map((opt, i) => (
+                            <option key={i} value={opt.product}>
+                              {opt.product} ({opt.availableQuantity} units av.)
+                            </option>
+                          ))}
+                        </select>
+                        {item.costPrice > 0 && (
+                          <p className="text-[9px] text-emerald-600 font-bold mt-1.5 font-mono bg-emerald-50 px-1 py-0.5 rounded border border-emerald-150 inline-block">
+                            Unit Cost: {formatAED(item.costPrice)}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Quantity *</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={item.availableQuantity || 9999}
+                          value={item.quantity}
+                          onChange={e => handleProductRowChange(index, "quantity", parseInt(e.target.value) || 1)}
+                          required
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-blue-500"
+                        />
+                        {item.availableQuantity > 0 && (
+                          <p className="text-[9px] text-blue-600 font-bold mt-0.5">Max allowed: {item.availableQuantity}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Selling Price *</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={0}
+                            value={item.unitPrice}
+                            onChange={e => handleProductRowChange(index, "unitPrice", parseFloat(e.target.value) || 0)}
+                            required
+                            className="w-full bg-white border border-slate-200 rounded-lg pl-2.5 pr-8 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-blue-500"
+                          />
+                          <span className="absolute inset-y-0 right-2 flex items-center text-[9px] text-slate-400 font-bold">AED</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Cost</span>
+                          <span className="text-xs font-bold font-mono text-slate-500 block py-1.5 px-0.5">
+                            {formatAED(item.quantity * item.unitPrice)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-100 flex justify-end gap-3 font-sans">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOrderModalOpen(false);
+                  setEditingOrderId(null);
+                }}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
+              >
+                Cancel Draft
+              </button>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white hover:bg-blue-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition"
+              >
+                {editingOrderId ? "Update & Save Order" : "Book Order Transaction"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       </main>
     </div>
