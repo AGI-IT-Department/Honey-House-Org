@@ -1059,7 +1059,7 @@ export default function App() {
             <div>
               <h1 className="font-bold text-lg leading-none text-slate-900 tracking-tight">Honey House</h1>
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-[10px] text-amber-600 font-bold tracking-wide uppercase">بيت العسل</span>
+                <span className="text-[10px] text-amber-600 font-bold tracking-wide uppercase">UAE Honey House</span>
                 <span className="text-[8px] bg-amber-100 text-amber-800 font-extrabold px-1 py-0.2 rounded font-mono">CORE v2</span>
               </div>
             </div>
@@ -1180,10 +1180,10 @@ export default function App() {
             <button
               onClick={openAddOrderModal}
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-blue-500/10"
-              title="Add a dynamic customer order immediately"
+              title="Add a dynamic customer order"
             >
               <Plus className="w-4 h-4" />
-              <span>New Order / طلب جديد</span>
+              <span>New Order</span>
             </button>
           </div>
         </header>
@@ -1511,38 +1511,8 @@ export default function App() {
         {page === "orders" && (
           <div className="space-y-6">
             
-            {/* Embedded Order Tab Ribbon */}
-            <div className="flex border-b border-slate-200 justify-between items-center pr-1 pb-1">
-              <div className="flex">
-                <button
-                  onClick={() => setOrdersTab("view")}
-                  className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
-                    ordersTab === "view" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"
-                  }`}
-                >
-                  All Orders Book
-                </button>
-                <button
-                  onClick={openAddOrderModal}
-                  className="px-6 py-3 font-semibold text-sm border-b-2 transition flex items-center gap-2 border-transparent text-slate-400 hover:text-slate-800"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Create New Order</span>
-                </button>
-              </div>
-
-              <button
-                onClick={openAddOrderModal}
-                className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-xs"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Quick Add Order / إضافة سريعة</span>
-              </button>
-            </div>
-
-            {/* Sub-tab 1: ALL ORDERS BOOK */}
-            {ordersTab === "view" && (
-              <div className="space-y-6">
+            {/* Orders list shown directly */}
+            <div className="space-y-6">
                 
                 {/* Advanced Multi-Filter controls */}
                 <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
@@ -1711,15 +1681,15 @@ export default function App() {
                                   <button
                                     onClick={() => handleEditClick(item)}
                                     className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200/60 transition flex items-center gap-1 text-[10px] font-bold"
-                                    title="Edit Order / تعديل الطلب"
+                                    title="Edit Order"
                                   >
                                     <Edit2 className="w-3.5 h-3.5" />
-                                    <span>تعديل</span>
+                                    <span>Edit</span>
                                   </button>
                                   <button
                                     onClick={() => handleDeleteOrder(item["Order ID"])}
                                     className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition"
-                                    title="Delete Order / حذف"
+                                    title="Delete Order"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
@@ -1731,7 +1701,7 @@ export default function App() {
                         {orders.length === 0 && (
                           <tr>
                             <td colSpan={10} className="p-8 text-center text-slate-400 font-medium font-sans">
-                              No orders found. Set filters or add a new order transaction using the tab above.
+                              No orders found. Set filters or click "New Order" to add a transaction.
                             </td>
                           </tr>
                         )}
@@ -1740,7 +1710,6 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            )}
 
           </div>
         )}
@@ -2019,7 +1988,6 @@ export default function App() {
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
                       <Scale className="w-4 h-4 text-amber-500" />
                       <span>Batch Total Weight (KG) *</span>
-                      <span className="text-[#d97706] font-bold">الوزن الكلي للباتش</span>
                     </label>
                     <input
                       type="number"
@@ -2671,7 +2639,7 @@ export default function App() {
                   <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                     <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
                       <ShoppingBag className="w-5 h-5 text-blue-600" />
-                      <span>{editingOrderId ? `Edit Customer Order / تعديل طلب [${editingOrderId}]` : "Create New Customer Order / طلب عميل جديد"}</span>
+                      <span>{editingOrderId ? `Edit Customer Order [${editingOrderId}]` : "Create New Customer Order"}</span>
                     </span>
                     <button 
                       type="button" 
@@ -2820,7 +2788,7 @@ export default function App() {
                         return (
                           <div key={index} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/30 grid grid-cols-1 md:grid-cols-5 gap-3 items-end relative">
                             <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Batch ID * (مع كمية)</label>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Batch ID *</label>
                               <select
                                 value={item.batchId}
                                 onChange={e => handleProductRowChange(index, "batchId", e.target.value)}
@@ -2929,7 +2897,7 @@ export default function App() {
         )}
 
         {/* ----------------------------------------------------
-           PRODUCT CATALOG VIEW (قائمة وصيانة المنتجات)
+           PRODUCT CATALOG VIEW (PRODUCT CATALOG SETUP)
            ---------------------------------------------------- */}
         {page === "products" && (
           <div className="space-y-8 animate-fadeIn">
@@ -2940,7 +2908,6 @@ export default function App() {
                 <h3 className="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
                   <Tag className="w-5 h-5 text-amber-500" />
                   <span>Product Catalog Management & Setup</span>
-                  <span className="text-amber-600 font-bold ml-1 text-sm bg-amber-50 px-2 py-0.5 rounded border border-amber-200">إدارة دليل المنتجات</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
                   Define item weights (g) and default pricing. Added products automatically propagate through batches.
@@ -2957,7 +2924,7 @@ export default function App() {
                   className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Add New Product / إضافة منتج</span>
+                  <span>Add New Product</span>
                 </button>
               </div>
             </div>
@@ -2976,7 +2943,7 @@ export default function App() {
 
                 <form onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct} className="space-y-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Product Name * (اسم المنتج)</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Product Name *</label>
                     <input
                       type="text"
                       required
@@ -2996,7 +2963,7 @@ export default function App() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (Grams) * (الوزن بالجرام)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (Grams) *</label>
                       <input
                         type="number"
                         min={0}
@@ -3016,7 +2983,7 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (KG) / بالكيلو</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (KG)</label>
                       <div className="w-full bg-slate-100 border border-slate-200/60 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-400">
                         {(((editingProduct ? editingProduct.weight_g : newProductForm.weight_g) || 0) / 1000).toFixed(3)} kg
                       </div>
