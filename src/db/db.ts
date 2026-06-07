@@ -2009,42 +2009,46 @@ export async function getDashboardData(
 
   // Available Weight & Import statistics
   const bList = await getBatches();
-  let availableWeightTotal = 0;
   let totalImportedWeight = 0;
 
   for (const b of bList) {
     if (batchId && batchId !== "all" && b["Import Batch ID"] !== batchId) continue;
-    if (b.Status === "Active") {
-      availableWeightTotal += b["Available Weight"] || 0;
-    }
     totalImportedWeight += b["Total Weight"] || 0;
   }
 
-  const netProfit = totalProfit - totalExpensesVal;
-  const distributableProfit = netProfit - totalDistributionsVal;
+  // Calculate dynamic stock remainder matching imports minus outflows
+  const totalWastedAndSampleWeight = wastedWeight + freeSamplesWeight;
+  const availableWeightTotal = Math.max(0, totalImportedWeight - totalWeightKG - totalWastedAndSampleWeight);
+
   const balanceStatsValue = await getBalanceStatistics();
+  
+  // Pivot calculations directly to general ledger flows
+  const totalSalesLedger = balanceStatsValue.totalIncome;
+  const totalExpensesLedger = balanceStatsValue.totalExpenses;
+  const netProfit = totalSalesLedger - totalExpensesLedger;
+  const distributableProfit = netProfit;
 
   return {
-    totalSales: Math.round(totalSales * 100) / 100,
+    totalSales: Math.round(totalSalesLedger * 100) / 100,
     grossProfit: Math.round(totalProfit * 100) / 100,
     netProfit: Math.round(netProfit * 100) / 100,
     currentBalance: Math.round(balanceStatsValue.currentBalance * 100) / 100,
     distributableProfit: Math.round(distributableProfit * 100) / 100,
-    totalExpenses: Math.round(totalExpensesVal * 100) / 100,
-    totalProfitDistributions: Math.round(totalDistributionsVal * 100) / 100,
+    totalExpenses: Math.round(totalExpensesLedger * 100) / 100,
+    totalProfitDistributions: 0,
     totalOrders,
     totalOrdersWeight,
     totalWeightKG: Math.round(totalWeightKG * 100) / 100,
     availableWeightTotal: Math.round(availableWeightTotal * 100) / 100,
     wastedWeight: Math.round(wastedWeight * 100) / 100,
     freeSamplesWeight: Math.round(freeSamplesWeight * 100) / 100,
-    totalWastedAndSamples: Math.round((wastedWeight + freeSamplesWeight) * 100) / 100,
+    totalWastedAndSamples: Math.round(totalWastedAndSampleWeight * 100) / 100,
     totalImportedWeight: Math.round(totalImportedWeight * 100) / 100,
     avgWeightPerOrder: totalOrdersWeight > 0 ? Math.round((totalWeightKG / totalOrdersWeight) * 100) / 100 : 0,
-    avgOrderValue: paidOrders > 0 ? Math.round((totalSales / paidOrders) * 100) / 100 : 0,
-    grossProfitMargin: totalSales > 0 ? Math.round((totalProfit / totalSales) * 100 * 100) / 100 : 0,
-    netProfitMargin: totalSales > 0 ? Math.round((netProfit / totalSales) * 100 * 100) / 100 : 0,
-    wastedMargin: totalImportedWeight > 0 ? Math.round(((wastedWeight + freeSamplesWeight) / totalImportedWeight) * 100 * 100) / 100 : 0,
+    avgOrderValue: paidOrders > 0 ? Math.round((totalSalesLedger / paidOrders) * 100) / 100 : 0,
+    grossProfitMargin: totalSalesLedger > 0 ? Math.round((totalProfit / totalSalesLedger) * 100 * 100) / 100 : 0,
+    netProfitMargin: totalSalesLedger > 0 ? Math.round((netProfit / totalSalesLedger) * 100 * 100) / 100 : 0,
+    wastedMargin: totalImportedWeight > 0 ? Math.round((totalWastedAndSampleWeight / totalImportedWeight) * 100 * 100) / 100 : 0,
     paidOrders,
     pendingOrders,
     deliveredOrders,

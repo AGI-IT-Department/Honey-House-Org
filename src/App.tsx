@@ -1125,25 +1125,25 @@ export default function App() {
                   </h3>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                  <span className="text-slate-500 font-medium font-sans">From paid orders only</span>
+                  <span className="text-slate-500 font-medium font-sans">General ledger inflow</span>
                   <span className="text-emerald-500 font-semibold flex items-center gap-1 font-mono">
                     {dashboard?.paidOrders} approved
                   </span>
                 </div>
               </div>
 
-              {/* Gross Profit */}
+              {/* Total Expenses */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between hover:border-slate-300 transition duration-205">
                 <div>
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Gross Profit</span>
-                  <h3 className="text-2xl font-bold font-mono text-blue-600 tracking-tight">
-                    {formatAED(dashboard?.grossProfit)}
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Expenses</span>
+                  <h3 className="text-2xl font-bold font-mono text-rose-600 tracking-tight">
+                    {formatAED(dashboard?.totalExpenses)}
                   </h3>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                  <span className="text-slate-500 font-medium">Before expenses</span>
-                  <span className="text-blue-600 font-bold font-mono bg-blue-50 px-2 py-0.5 rounded-md">
-                    {dashboard?.grossProfitMargin}% margin
+                  <span className="text-slate-500 font-medium font-sans">General ledger outflow</span>
+                  <span className="text-rose-600 font-bold font-mono bg-rose-50 px-2 py-0.5 rounded-md">
+                    Actual cost
                   </span>
                 </div>
               </div>
@@ -1157,9 +1157,9 @@ export default function App() {
                   </h3>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                  <span className="text-slate-500 font-medium">After expenses</span>
+                  <span className="text-slate-500 font-medium">After all expenses</span>
                   <span className="text-emerald-600 font-bold font-mono bg-emerald-50 px-2 py-0.5 rounded-md">
-                    {dashboard?.netProfitMargin}% margin
+                    {dashboard?.netProfitMargin}% net ratio
                   </span>
                 </div>
               </div>
