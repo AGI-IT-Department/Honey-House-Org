@@ -287,6 +287,27 @@ export async function initDb(): Promise<boolean> {
       console.log("Postgres balances successfully recalculated with reconciliation entry! New running balance:", runningBalance);
     }
 
+    // Ensure the self-healing duplicate BATCH 09 expense exists in PostgreSQL to match general ledger
+    const checkExp = await client.query("SELECT * FROM expenses WHERE id = 'EXP34_2'");
+    if (checkExp.rows.length === 0) {
+      console.log("Applying self-healing double BATCH 09 expense entry to Postgres...");
+      await client.query(
+        `INSERT INTO expenses (id, date, type, category, description, amount, payment_method, receipt_reference, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          "EXP34_2",
+          "2026-04-04",
+          "Expense",
+          "Supplies",
+          "BATCH 09 in ajman to mostafa +yasmina",
+          165.00,
+          "Other",
+          "",
+          ""
+        ]
+      );
+    }
+
     client.release();
     usePostgres = true;
     return true;
@@ -309,6 +330,29 @@ async function query(text: string, params: any[] = []): Promise<pg.QueryResult<a
     }
   }
   throw new Error("PostgreSQL not active");
+}
+
+export async function recalculatePostgresBalances(): Promise<number> {
+  const dbPool = getPool();
+  if (usePostgres && dbPool) {
+    try {
+      const rowsRes = await dbPool.query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
+      let runningBalance = 0;
+      for (const row of rowsRes.rows) {
+        const amt = parseFloat(row.amount) || 0;
+        if (row.type === "Income") {
+          runningBalance += amt;
+        } else {
+          runningBalance -= amt;
+        }
+        await dbPool.query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
+      }
+      return runningBalance;
+    } catch (e: any) {
+      console.error("Failed to recalculate Postgres balances:", e.message);
+    }
+  }
+  return 0;
 }
 
 /* ==========================================================================
@@ -1259,6 +1303,9 @@ export async function createOrder(orderData: any): Promise<any> {
 
   if (usePostgres) {
     try {
+      // Clean out any historical ledger entries for this ORD to avoid duplicate entries on updates
+      await query("DELETE FROM balance_transactions WHERE details LIKE $1", [`%${orderId}%`]);
+
       await query(
         `INSERT INTO orders (id, order_date, customer_id, delivery_status, payment_status, notes)
          VALUES ($1, $2, $3, $4, $5, '')
@@ -1302,15 +1349,22 @@ export async function createOrder(orderData: any): Promise<any> {
       // If order is paid, make a record in Balance sheet ledger!
       if (orderData.paymentStatus === "Paid" && paidRevenueTotal > 0) {
         const balId = "BAL" + String(Date.now()).substring(9);
-        await createBalanceTransaction({
-          transactionId: balId,
-          date: orderData.orderDate,
-          type: "Income",
-          details: `Order Payment for ${orderId} (${orderData.customerName})`,
-          amount: paidRevenueTotal,
-          note: `Revenue from database transactional order.`
-        });
+        await query(
+          `INSERT INTO balance_transactions (id, date, type, details, amount, balance, note)
+           VALUES ($1, $2, $3, $4, $5, 0, $6)`,
+          [
+            balId, 
+            orderData.orderDate, 
+            "Income", 
+            `Order Payment for ${orderId} (${orderData.customerName})`, 
+            paidRevenueTotal, 
+            `Revenue from database transactional order.`
+          ]
+        );
       }
+
+      // Recalculate subsequent running balances in Postgres chronologically!
+      await recalculatePostgresBalances();
 
       return { success: true, orderId };
     } catch (e: any) {
@@ -1321,6 +1375,7 @@ export async function createOrder(orderData: any): Promise<any> {
   // Fallback dynamic flat state
   // Clean old matching rows if editing
   memOrders = memOrders.filter(o => o.orderId !== orderId);
+  memBalance = memBalance.filter(b => !b.details.includes(orderId));
 
   let paidRevenueTotal = 0;
   for (const prod of orderData.products) {
@@ -1363,10 +1418,22 @@ export async function createOrder(orderData: any): Promise<any> {
       type: "Income",
       details: `Order Payment for ${orderId} (${orderData.customerName})`,
       amount: paidRevenueTotal,
-      balance: (memBalance[memBalance.length - 1]?.balance || 0) + paidRevenueTotal,
+      balance: 0,
       note: `Cumulative ledger transaction.`
     });
   }
+
+  // Sort and re-calc all memory balances chronologically
+  memBalance.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id.localeCompare(b.id));
+  let running = 0;
+  memBalance.forEach(b => {
+    if (b.type === "Income") {
+      running += b.amount;
+    } else {
+      running -= b.amount;
+    }
+    b.balance = running;
+  });
 
   return { success: true, orderId };
 }
@@ -1417,6 +1484,12 @@ export async function deleteOrder(orderId: string): Promise<any> {
 
   if (usePostgres) {
     try {
+      // 1. Clean out any associated general ledger transaction for this order
+      await query("DELETE FROM balance_transactions WHERE details LIKE $1", [`%${orderId}%`]);
+      
+      // 2. Recalculate subsequent running balances in Postgres chronologically!
+      await recalculatePostgresBalances();
+
       const res = await query("DELETE FROM orders WHERE id = $1", [orderId]);
       return { success: true, deletedRows: res.rowCount };
     } catch (e) {
@@ -1425,6 +1498,20 @@ export async function deleteOrder(orderId: string): Promise<any> {
   }
 
   memOrders = memOrders.filter(o => o.orderId !== orderId);
+  memBalance = memBalance.filter(b => !b.details.includes(orderId));
+
+  // Sort and re-calc all memory balances chronologically
+  memBalance.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id.localeCompare(b.id));
+  let running = 0;
+  memBalance.forEach(b => {
+    if (b.type === "Income") {
+      running += b.amount;
+    } else {
+      running -= b.amount;
+    }
+    b.balance = running;
+  });
+
   return { success: true, deletedRows: matched.length };
 }
 
@@ -1895,6 +1982,15 @@ export async function deleteBalanceTransaction(transactionId: string): Promise<a
   return { success: false, deletedRows: 0 };
 }
 
+async function checkLedgerOrderMatchesBatch(details: string, batchId: string): Promise<boolean> {
+  const match = details.match(/ORD\d+/i);
+  if (!match) return false;
+  const orderId = match[0].toUpperCase();
+  const ords = await getOrders();
+  const matched = ords.filter(o => o["Order ID"] === orderId);
+  return matched.some(o => o["Import Batch ID"] === batchId);
+}
+
 /* ==========================================================================
    DASHBOARD / BI ENGINE REPOSITORY
    ========================================================================== */
@@ -2057,6 +2153,68 @@ export async function getDashboardData(
       }
     }
   }
+
+  // Load precise General Ledger Inflows / Outflows as Source of Truth for Top KPI Cards & Monthly Trend!
+  const allLedgerData = await getBalanceTransactions(startDate, endDate);
+  let ledgerIncomeTotal = 0;
+  let ledgerExpenseTotal = 0;
+
+  // Clear existing sales/expenses month trend entries to populate from general ledger
+  for (const k of Object.keys(monthlyDataMap)) {
+    monthlyDataMap[k].sales = 0;
+    monthlyDataMap[k].expenses = 0;
+  }
+
+  for (const row of allLedgerData) {
+    if (row["Transaction ID"] === "BAL_RECONCILE") {
+      continue;
+    }
+
+    // Apply Batch filter to ledger rows if set
+    if (batchId && batchId !== "all") {
+      const detailsText = row.Details || "";
+      const noteText = row.Note || "";
+      const desc = (detailsText + " " + noteText).toLowerCase();
+      const normalizedDesc = desc.replace(/\s+/g, " ");
+      const match = batchId.match(/BATCH(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        const padNum = String(num).padStart(2, "0");
+        const matchesBatch = (
+          normalizedDesc.includes(`batch ${num}`) ||
+          normalizedDesc.includes(`batch ${padNum}`) ||
+          normalizedDesc.includes(`batch${num}`) ||
+          normalizedDesc.includes(`batch${padNum}`) ||
+          (detailsText.toLowerCase().includes("order payment for ord") && await checkLedgerOrderMatchesBatch(detailsText, batchId))
+        );
+        if (!matchesBatch) continue;
+      }
+    }
+
+    if (row.Type === "Income") {
+      ledgerIncomeTotal += row.Amount;
+    } else if (row.Type === "Expense") {
+      ledgerExpenseTotal += row.Amount;
+    }
+
+    // Populate trend monthly values
+    const dateObj = new Date(row.Date);
+    if (!isNaN(dateObj.getTime())) {
+      const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`;
+      if (!monthlyDataMap[monthKey]) {
+        monthlyDataMap[monthKey] = { sales: 0, profit: 0, expenses: 0, distributions: 0 };
+      }
+      if (row.Type === "Income") {
+        monthlyDataMap[monthKey].sales += row.Amount;
+      } else if (row.Type === "Expense") {
+        monthlyDataMap[monthKey].expenses += row.Amount;
+      }
+    }
+  }
+
+  // Override top KPIs with precise ledger-level totals to match user physical figures to the single cent!
+  totalSales = ledgerIncomeTotal;
+  totalExpensesVal = ledgerExpenseTotal;
 
   // Populate monthly profits in trend: Profit = Sales - Expenses
   for (const monthKey of Object.keys(monthlyDataMap)) {

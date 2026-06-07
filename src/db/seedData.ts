@@ -469,6 +469,7 @@ export const SEED_EXPENSES: ExpenseSeed[] = [
   { id: "EXP32", date: "2026-02-23", type: "Expense", category: "Supplies", description: "Batch 8 here in Dubai", amount: 105, paymentMethod: "Other", reference: "", notes: "" },
   { id: "EXP33", date: "2026-03-10", type: "Expense", category: "Other", description: "transfer to Egypt", amount: 265, paymentMethod: "Other", reference: "", notes: "" },
   { id: "EXP34", date: "2026-04-04", type: "Expense", category: "Supplies", description: "BATCH 09 in ajman to mostafa +yasmina", amount: 165, paymentMethod: "Other", reference: "", notes: "" },
+  { id: "EXP34_2", date: "2026-04-04", type: "Expense", category: "Supplies", description: "BATCH 09 in ajman to mostafa +yasmina", amount: 165, paymentMethod: "Other", reference: "", notes: "" },
   { id: "EXP35", date: "2026-04-07", type: "Expense", category: "Other", description: "transfer to Egypt from merna", amount: 85, paymentMethod: "Other", reference: "", notes: "" },
   { id: "EXP36", date: "2026-04-28", type: "Expense", category: "Other", description: "to Egypt in advanced to buy honey20000 bound", amount: 1430, paymentMethod: "Other", reference: "", notes: "" },
   { id: "EXP37", date: "2026-06-03", type: "Expense", category: "Supplies", description: "20 pics 380 ml / 14 pics 180 ml / mini label printer /150 pics label par", amount: 227, paymentMethod: "Other", reference: "", notes: "" },
