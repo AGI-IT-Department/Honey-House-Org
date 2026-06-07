@@ -1487,7 +1487,7 @@ export default function App() {
                           <th className="p-4">Honey Product</th>
                           <th className="p-4">Qty</th>
                           <th className="p-4">Total Sale</th>
-                          <th className="p-4">Net Profit</th>
+                          <th className="p-4">Product Cost</th>
                           <th className="p-4 text-center">Status</th>
                           <th className="p-4">Import Batch</th>
                           <th className="p-4 text-right">Row Operations</th>
@@ -1513,8 +1513,11 @@ export default function App() {
                               <td className="p-4 font-mono font-semibold text-slate-900">
                                 {formatAED(item["Total Sale"])}
                               </td>
-                              <td className={`p-4 font-mono font-bold ${item["Profit"] >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-                                {formatAED(item["Profit"])}
+                              <td className="p-4 font-mono text-slate-500 whitespace-nowrap">
+                                <div className="space-y-0.5 text-left">
+                                  <p>Unit: <span className="font-semibold text-slate-700">{formatAED(item["Cost Price"])}</span></p>
+                                  <p className="text-[10px] text-slate-400">Total: {formatAED(item["Total Cost"])}</p>
+                                </div>
                               </td>
                               <td className="p-4 text-center whitespace-nowrap">
                                 <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold mr-1.5 ${
@@ -1721,6 +1724,11 @@ export default function App() {
                                 </option>
                               ))}
                             </select>
+                            {item.costPrice > 0 && (
+                              <p className="text-[9px] text-emerald-600 font-bold mt-1.5 font-mono bg-emerald-50 px-1 py-0.5 rounded border border-emerald-150 inline-block">
+                                Unit Cost: {formatAED(item.costPrice)}
+                              </p>
+                            )}
                           </div>
 
                           <div>
