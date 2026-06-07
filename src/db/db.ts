@@ -1881,7 +1881,25 @@ export async function getDashboardData(
 
   // Aggregate using all existing repo modules to match business calculations perfectly!
   const ordersList = await getOrders(startDate, endDate, batchId);
-  const expensesList = await getExpenses(startDate, endDate);
+  
+  // Expenses should be taken from the expenses table, applying standard date and batch filters
+  let expensesList = await getExpenses(startDate, endDate);
+  if (batchId && batchId !== "all") {
+    expensesList = expensesList.filter(exp => {
+      const desc = ((exp.Description || "") + " " + (exp.Notes || "")).toLowerCase();
+      const normalizedDesc = desc.replace(/\s+/g, " ");
+      const match = batchId.match(/BATCH(\d+)/i);
+      if (!match) return true;
+      const num = parseInt(match[1], 10);
+      const padNum = String(num).padStart(2, "0");
+      return (
+        normalizedDesc.includes(`batch ${num}`) ||
+        normalizedDesc.includes(`batch ${padNum}`) ||
+        normalizedDesc.includes(`batch${num}`) ||
+        normalizedDesc.includes(`batch${padNum}`)
+      );
+    });
+  }
 
   let totalSales = 0;
   let totalProfit = 0;
@@ -1910,9 +1928,11 @@ export async function getDashboardData(
     const pName = item["Product"] || "";
     const notesStr = (item["Notes"] || "").toLowerCase();
 
+    // Sum overall sales of matching orders
+    totalSales += sale;
+    totalProfit += profit;
+
     if (isPaid) {
-      totalSales += sale;
-      totalProfit += profit;
       paidOrders++;
     } else {
       pendingOrders++;
@@ -1966,15 +1986,14 @@ export async function getDashboardData(
       productVolumeMap[pName] = (productVolumeMap[pName] || 0) + qty;
     }
 
-    // Group sales and profit by Month Trend
+    // Group sales by Month Trend
     const dateObj = new Date(item["Order Date"]);
-    if (isPaid && !isNaN(dateObj.getTime())) {
+    if (!isNaN(dateObj.getTime())) {
       const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`;
       if (!monthlyDataMap[monthKey]) {
         monthlyDataMap[monthKey] = { sales: 0, profit: 0, expenses: 0, distributions: 0 };
       }
       monthlyDataMap[monthKey].sales += sale;
-      monthlyDataMap[monthKey].profit += profit;
     }
   }
 
@@ -2004,6 +2023,11 @@ export async function getDashboardData(
         monthlyDataMap[monthKey].distributions += amt;
       }
     }
+  }
+
+  // Populate monthly profits in trend: Profit = Sales - Expenses
+  for (const monthKey of Object.keys(monthlyDataMap)) {
+    monthlyDataMap[monthKey].profit = monthlyDataMap[monthKey].sales - monthlyDataMap[monthKey].expenses;
   }
 
   // Format collections for D3 structures
@@ -2057,19 +2081,26 @@ export async function getDashboardData(
 
   const balanceStatsValue = await getBalanceStatistics();
   
-  // Pivot calculations directly to general ledger flows
-  const totalSalesLedger = balanceStatsValue.totalIncome;
-  const totalExpensesLedger = balanceStatsValue.totalExpenses;
-  const netProfit = totalSalesLedger - totalExpensesLedger;
+  // Reconciled balance evaluated up to the selected endDate for proper response to date filters
+  const allTransBeforeEndDate = await getBalanceTransactions(undefined, endDate);
+  let finalCurrentBalance = 0;
+  if (allTransBeforeEndDate.length > 0) {
+    const sortedChronological = [...allTransBeforeEndDate].sort((a,b) => new Date(a.Date).getTime() - new Date(b.Date).getTime() || a["Transaction ID"].localeCompare(b["Transaction ID"]));
+    finalCurrentBalance = sortedChronological[sortedChronological.length - 1]?.Balance || 0;
+  }
+
+  // Calculate profit: Net Profit = Total Sales (Orders) - Total Expenses (from expenses table)
+  const netProfit = totalSales - totalExpensesVal;
   const distributableProfit = netProfit;
+  const netProfitMarginVal = totalSales > 0 ? Math.round((netProfit / totalSales) * 100 * 100) / 100 : 0;
 
   return {
-    totalSales: Math.round(totalSalesLedger * 100) / 100,
-    grossProfit: Math.round(totalProfit * 100) / 100,
+    totalSales: Math.round(totalSales * 100) / 100,
+    grossProfit: Math.round(totalSales * 100) / 100, // No product cost deduction
     netProfit: Math.round(netProfit * 100) / 100,
-    currentBalance: Math.round(balanceStatsValue.currentBalance * 100) / 100,
+    currentBalance: Math.round(finalCurrentBalance * 100) / 100,
     distributableProfit: Math.round(distributableProfit * 100) / 100,
-    totalExpenses: Math.round(totalExpensesLedger * 100) / 100,
+    totalExpenses: Math.round(totalExpensesVal * 100) / 100,
     totalProfitDistributions: 0,
     totalOrders,
     totalOrdersWeight,
@@ -2080,9 +2111,9 @@ export async function getDashboardData(
     totalWastedAndSamples: Math.round(finalWastedAndSampleWeight * 100) / 100,
     totalImportedWeight: Math.round(finalImportedWeight * 100) / 100,
     avgWeightPerOrder: totalOrdersWeight > 0 ? Math.round((finalWeightKG / totalOrdersWeight) * 100) / 100 : 0,
-    avgOrderValue: paidOrders > 0 ? Math.round((totalSalesLedger / paidOrders) * 100) / 100 : 0,
-    grossProfitMargin: totalSalesLedger > 0 ? Math.round((totalProfit / totalSalesLedger) * 100 * 100) / 100 : 0,
-    netProfitMargin: totalSalesLedger > 0 ? Math.round((netProfit / totalSalesLedger) * 100 * 100) / 100 : 0,
+    avgOrderValue: paidOrders > 0 ? Math.round((totalSales / paidOrders) * 100) / 100 : 0,
+    grossProfitMargin: totalSales > 0 ? 100 : 0,
+    netProfitMargin: netProfitMarginVal,
     wastedMargin: finalImportedWeight > 0 ? Math.round((finalWastedAndSampleWeight / finalImportedWeight) * 100 * 100) / 100 : 0,
     paidOrders,
     pendingOrders,
@@ -2095,7 +2126,6 @@ export async function getDashboardData(
     appliedBatchFilter: batchId || "all"
   };
 }
-
 export function getExpenseCategories(): string[] {
   return [
     "Rent",

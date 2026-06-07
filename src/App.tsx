@@ -1183,68 +1183,36 @@ export default function App() {
             </section>
 
             {/* KPI Cards Panel - Row 2 */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              
-              {/* Total Orders */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between hover:border-slate-300 transition duration-205">
-                <div>
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Orders</span>
-                  <h3 className="text-2xl font-bold font-mono text-slate-950 tracking-tight">
-                    {dashboard?.totalOrders}
-                  </h3>
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                  <span className="text-slate-500 font-medium">All orders in filter</span>
-                  <span className="text-slate-600 font-semibold font-mono">
-                    {dashboard?.totalOrders} total
-                  </span>
-                </div>
-              </div>
+            <section className="grid grid-cols-1 gap-6">
 
-              {/* Net Profit Margin */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100/20 flex flex-col justify-between hover:border-slate-300 transition duration-205">
+              {/* Stock Summary Balance (KG) - converted to an elegant full-width statistics ribbon */}
+              <div className="bg-gradient-to-br from-violet-600 to-indigo-750 p-6 rounded-2xl text-white shadow-lg flex flex-col justify-between">
                 <div>
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Net Profit Margin</span>
-                  <h3 className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
-                    {dashboard?.netProfitMargin}%
-                  </h3>
-                </div>
-                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                  <span className="text-slate-500 font-medium">Net Profit / Revenue</span>
-                  <span className="text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded text-[10px]">
-                    Efficiency
-                  </span>
-                </div>
-              </div>
-
-              {/* Stock Summary Balance (KG) - spans 2 columns on larger screens */}
-              <div className="lg:col-span-2 bg-gradient-to-br from-violet-600 to-indigo-750 p-6 rounded-2xl text-white shadow-lg flex flex-col justify-between">
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider mb-3.5 flex items-center gap-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
                     <Scale className="w-4.5 h-4.5 text-indigo-200" />
                     <span>Stock Summary Balance (KG)</span>
                   </h4>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs text-indigo-100 font-medium">
-                    <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-8 text-xs text-indigo-100 font-medium">
+                    <div className="flex justify-between sm:flex-col sm:items-start sm:gap-1.5 pb-2 border-b border-white/10 sm:border-b-0 sm:border-r sm:border-white/10 sm:pr-4">
                       <span>Total Sold Weight:</span>
-                      <span className="font-mono font-bold text-white">{(dashboard?.totalWeightKG || 0).toFixed(2)} KG</span>
+                      <span className="font-mono font-bold text-white text-base sm:text-lg">{(dashboard?.totalWeightKG || 0).toFixed(2)} KG</span>
                     </div>
-                    <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                    <div className="flex justify-between sm:flex-col sm:items-start sm:gap-1.5 pb-2 border-b border-white/10 sm:border-b-0 lg:border-r lg:border-white/10 lg:pr-4">
                       <span>Available Stock:</span>
-                      <span className="font-mono font-bold text-white">{(dashboard?.availableWeightTotal || 0).toFixed(2)} KG</span>
+                      <span className="font-mono font-bold text-white text-base sm:text-lg">{(dashboard?.availableWeightTotal || 0).toFixed(2)} KG</span>
                     </div>
-                    <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                    <div className="flex justify-between sm:flex-col sm:items-start sm:gap-1.5 pb-2 border-b border-white/10 sm:border-b-0 sm:border-r sm:border-white/10 sm:pr-4">
                       <span>Wasted & Free Samples:</span>
-                      <span className="font-mono font-bold text-rose-300">{(dashboard?.totalWastedAndSamples || 0).toFixed(2)} KG</span>
+                      <span className="font-mono font-bold text-rose-300 text-base sm:text-lg">{(dashboard?.totalWastedAndSamples || 0).toFixed(2)} KG</span>
                     </div>
-                    <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                    <div className="flex justify-between sm:flex-col sm:items-start sm:gap-1.5 pb-2 sm:border-b-0">
                       <span>Total Imported Weight:</span>
-                      <span className="font-mono font-bold text-white">{(dashboard?.totalImportedWeight || 0).toFixed(2)} KG</span>
+                      <span className="font-mono font-bold text-white text-base sm:text-lg">{(dashboard?.totalImportedWeight || 0).toFixed(2)} KG</span>
                     </div>
                   </div>
                 </div>
                 <div className="mt-4 pt-2.5 border-t border-white/15 flex justify-between items-center text-xs">
-                  <span className="text-indigo-200 font-medium">Wasted & Sample Ratio:</span>
+                  <span className="text-indigo-200 font-medium font-sans">Wasted & Sample Ratio:</span>
                   <span className="font-mono font-bold text-emerald-300 bg-white/15 px-2 py-0.5 rounded-md">
                     {(dashboard?.wastedMargin || 0).toFixed(1)}% ratio
                   </span>
