@@ -123,9 +123,9 @@ export const SEED_BATCHES: BatchSeed[] = [
     notes: "10 kg honey + 3 kg beeswax + 50 g royal jelly + 50 g grains",
     items: [
       { productName: "Honey 1kg", quantity: 10, purchasePrice: 11, shippingPrice: 11, localCost: 3, totalCost: 25, status: "Inactive" },
-      { productName: "Honey 500g", quantity: 10, purchasePrice: 5, shippingPrice: 5.5, localCost: 2, totalCost: 13, status: "Inactive" },
-      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 10, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Inactive" },
-      { productName: "Honey 250g", quantity: 10, purchasePrice: 2.5, shippingPrice: 2.75, localCost: 1.5, totalCost: 7, status: "Inactive" }
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5, shippingPrice: 5.5, localCost: 2, totalCost: 12.5, status: "Inactive" },
+      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Inactive" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.5, shippingPrice: 2.75, localCost: 1.5, totalCost: 6.75, status: "Inactive" }
     ]
   },
   {
@@ -141,9 +141,9 @@ export const SEED_BATCHES: BatchSeed[] = [
     notes: "total pric 240 + shipping 200 +jar cos 95 == total Batch cost 535AED\n15 kg honey + 5 kg beeswax + 50 g royal jelly + 50 g grains",
     items: [
       { productName: "Honey 1kg", quantity: 20, purchasePrice: 11, shippingPrice: 11, localCost: 3, totalCost: 25, status: "Inactive" },
-      { productName: "Honey 500g", quantity: 15, purchasePrice: 5, shippingPrice: 5.5, localCost: 2, totalCost: 13, status: "Inactive" },
-      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 10, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Inactive" },
-      { productName: "Honey 250g", quantity: 15, purchasePrice: 2.5, shippingPrice: 2.75, localCost: 1.5, totalCost: 7, status: "Inactive" }
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5, shippingPrice: 5.5, localCost: 2, totalCost: 12.5, status: "Inactive" },
+      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Inactive" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.5, shippingPrice: 2.75, localCost: 1.5, totalCost: 6.75, status: "Inactive" }
     ]
   },
   {
@@ -159,9 +159,9 @@ export const SEED_BATCHES: BatchSeed[] = [
     notes: "total pric 195 + shipping 150 +jar cos 12*200=25 aed +app cost 57 == total Batch cost 427 AED\n10 kg honey + 5 kg beeswax + 50 g royal jelly + 50 g grains",
     items: [
       { productName: "Honey 1kg", quantity: 15, purchasePrice: 11, shippingPrice: 11, localCost: 3, totalCost: 25, status: "Inactive" },
-      { productName: "Honey 500g", quantity: 10, purchasePrice: 5, shippingPrice: 5.5, localCost: 2, totalCost: 13, status: "Inactive" },
-      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 10, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Inactive" },
-      { productName: "Honey 250g", quantity: 15, purchasePrice: 2.5, shippingPrice: 2.75, localCost: 1.25, totalCost: 7, status: "Inactive" }
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5, shippingPrice: 5.5, localCost: 2, totalCost: 12.5, status: "Inactive" },
+      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Inactive" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.5, shippingPrice: 2.75, localCost: 1.25, totalCost: 6.5, status: "Inactive" }
     ]
   },
   {
@@ -176,10 +176,10 @@ export const SEED_BATCHES: BatchSeed[] = [
     status: "Inactive",
     notes: "heater and shrink and sample =55+55=110\n15 kg honey +10 kg beeswax",
     items: [
-      { productName: "Honey 1kg", quantity: 25, purchasePrice: 16, shippingPrice: 4.4, localCost: 3, totalCost: 23, status: "Inactive" },
-      { productName: "Honey 500g", quantity: 15, purchasePrice: 8, shippingPrice: 2.2, localCost: 1.25, totalCost: 11, status: "Inactive" },
-      { productName: "beeswax 500g", quantity: 20, purchasePrice: 9, shippingPrice: 2.2, localCost: 2, totalCost: 13, status: "Inactive" },
-      { productName: "Honey 250g", quantity: 15, purchasePrice: 4, shippingPrice: 1.1, localCost: 2, totalCost: 7, status: "Inactive" }
+      { productName: "Honey 1kg", quantity: 25, purchasePrice: 16, shippingPrice: 4.4, localCost: 3, totalCost: 23.4, status: "Inactive" },
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 8, shippingPrice: 2.2, localCost: 1.25, totalCost: 11.45, status: "Inactive" },
+      { productName: "beeswax 500g", quantity: 0, purchasePrice: 9, shippingPrice: 2.2, localCost: 2, totalCost: 13.2, status: "Inactive" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 4, shippingPrice: 1.1, localCost: 2, totalCost: 7.1, status: "Inactive" }
     ]
   },
   {
@@ -194,9 +194,9 @@ export const SEED_BATCHES: BatchSeed[] = [
     status: "Inactive",
     notes: "10kg honey",
     items: [
-      { productName: "Honey 1kg", quantity: 10, purchasePrice: 10, shippingPrice: 2.5, localCost: 3, totalCost: 16, status: "Inactive" },
-      { productName: "Honey 500g", quantity: 10, purchasePrice: 5, shippingPrice: 1.25, localCost: 2.1, totalCost: 8, status: "Inactive" },
-      { productName: "Honey 250g", quantity: 10, purchasePrice: 2.5, shippingPrice: 0.625, localCost: 1.7, totalCost: 5, status: "Inactive" }
+      { productName: "Honey 1kg", quantity: 10, purchasePrice: 10, shippingPrice: 2.5, localCost: 3, totalCost: 15.5, status: "Inactive" },
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5, shippingPrice: 1.25, localCost: 2.1, totalCost: 8.35, status: "Inactive" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.5, shippingPrice: 0.63, localCost: 1.7, totalCost: 4.83, status: "Inactive" }
     ]
   },
   {
@@ -212,10 +212,10 @@ export const SEED_BATCHES: BatchSeed[] = [
     notes: "15 kg honey +10 kg beeswax",
     items: [
       { productName: "Honey 1kg", quantity: 25, purchasePrice: 11, shippingPrice: 10, localCost: 3, totalCost: 24, status: "Active" },
-      { productName: "Honey 500g", quantity: 25, purchasePrice: 5.5, shippingPrice: 5, localCost: 2.1, totalCost: 13, status: "Active" },
-      { productName: "beeswax 500g", quantity: 10, purchasePrice: 6, shippingPrice: 5, localCost: 5, totalCost: 16, status: "Active" },
-      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 10, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Active" },
-      { productName: "Honey 250g", quantity: 15, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 1.7, totalCost: 7, status: "Active" }
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5.5, shippingPrice: 5, localCost: 2.1, totalCost: 12.6, status: "Active" },
+      { productName: "beeswax 500g", quantity: 0, purchasePrice: 6, shippingPrice: 5, localCost: 5, totalCost: 16, status: "Active" },
+      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Active" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 1.7, totalCost: 6.95, status: "Active" }
     ]
   },
   {
@@ -230,13 +230,13 @@ export const SEED_BATCHES: BatchSeed[] = [
     status: "Active",
     notes: "20 kg honey",
     items: [
-      { productName: "Honey 1kg", quantity: 20, purchasePrice: 11.5, shippingPrice: 8, localCost: 3, totalCost: 23, status: "Active" },
-      { productName: "Honey 500g", quantity: 20, purchasePrice: 5.5, shippingPrice: 5, localCost: 2.1, totalCost: 13, status: "Active" },
-      { productName: "Honey (Squeeze 500g)", quantity: 10, purchasePrice: 5.5, shippingPrice: 5, localCost: 4, totalCost: 15, status: "Active" },
-      { productName: "Honey (Squeeze 250g)", quantity: 10, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 3, totalCost: 8, status: "Active" },
-      { productName: "beeswax 500g", quantity: 10, purchasePrice: 6, shippingPrice: 5, localCost: 5, totalCost: 16, status: "Active" },
-      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 10, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Active" },
-      { productName: "Honey 250g", quantity: 15, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 1.7, totalCost: 7, status: "Active" }
+      { productName: "Honey 1kg", quantity: 20, purchasePrice: 11.5, shippingPrice: 8, localCost: 3, totalCost: 22.5, status: "Active" },
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5.5, shippingPrice: 5, localCost: 2.1, totalCost: 12.6, status: "Active" },
+      { productName: "Honey (Squeeze 500g)", quantity: 0, purchasePrice: 5.5, shippingPrice: 5, localCost: 4, totalCost: 14.5, status: "Active" },
+      { productName: "Honey (Squeeze 250g)", quantity: 0, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 3, totalCost: 8.25, status: "Active" },
+      { productName: "beeswax 500g", quantity: 0, purchasePrice: 6, shippingPrice: 5, localCost: 5, totalCost: 16, status: "Active" },
+      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Active" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 1.7, totalCost: 6.95, status: "Active" }
     ]
   },
   {
@@ -252,10 +252,10 @@ export const SEED_BATCHES: BatchSeed[] = [
     notes: "",
     items: [
       { productName: "Honey 1kg", quantity: 15, purchasePrice: 10, shippingPrice: 10, localCost: 3, totalCost: 23, status: "Active" },
-      { productName: "Honey 500g", quantity: 15, purchasePrice: 5, shippingPrice: 5, localCost: 2.5, totalCost: 12.5, status: "Active" },
-      { productName: "Honey 250g", quantity: 15, purchasePrice: 2.5, shippingPrice: 2.5, localCost: 1.25, totalCost: 6.25, status: "Active" },
-      { productName: "Honey (Squeeze 250g)", quantity: 10, purchasePrice: 2.5, shippingPrice: 2.5, localCost: 3, totalCost: 8, status: "Active" },
-      { productName: "Honey (Squeeze 500g)", quantity: 10, purchasePrice: 5, shippingPrice: 5, localCost: 4, totalCost: 14, status: "Active" }
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5, shippingPrice: 5, localCost: 2.5, totalCost: 12.5, status: "Active" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.5, shippingPrice: 2.5, localCost: 1.25, totalCost: 6.25, status: "Active" },
+      { productName: "Honey (Squeeze 250g)", quantity: 0, purchasePrice: 2.5, shippingPrice: 2.5, localCost: 3, totalCost: 8, status: "Active" },
+      { productName: "Honey (Squeeze 500g)", quantity: 0, purchasePrice: 5, shippingPrice: 5, localCost: 4, totalCost: 14, status: "Active" }
     ]
   },
   {
@@ -271,12 +271,12 @@ export const SEED_BATCHES: BatchSeed[] = [
     notes: "",
     items: [
       { productName: "Honey 1kg", quantity: 15, purchasePrice: 10.5, shippingPrice: 14, localCost: 3, totalCost: 27.5, status: "Active" },
-      { productName: "Honey 500g", quantity: 10, purchasePrice: 5.5, shippingPrice: 7, localCost: 2, totalCost: 14.5, status: "Active" },
-      { productName: "Honey 250g", quantity: 10, purchasePrice: 2.75, shippingPrice: 3.5, localCost: 1.5, totalCost: 7.75, status: "Active" },
-      { productName: "Honey (Squeeze 250g)", quantity: 10, purchasePrice: 2.75, shippingPrice: 3.5, localCost: 3, totalCost: 9.25, status: "Active" },
-      { productName: "Honey (Squeeze 500g)", quantity: 10, purchasePrice: 5.5, shippingPrice: 7, localCost: 4, totalCost: 16.5, status: "Active" },
-      { productName: "beeswax 500g", quantity: 10, purchasePrice: 5.5, shippingPrice: 7, localCost: 6, totalCost: 18.5, status: "Active" },
-      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 5, purchasePrice: 8, shippingPrice: 7, localCost: 3, totalCost: 18, status: "Active" }
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5.5, shippingPrice: 7, localCost: 2, totalCost: 14.5, status: "Active" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.75, shippingPrice: 3.5, localCost: 1.5, totalCost: 7.75, status: "Active" },
+      { productName: "Honey (Squeeze 250g)", quantity: 0, purchasePrice: 2.75, shippingPrice: 3.5, localCost: 3, totalCost: 9.25, status: "Active" },
+      { productName: "Honey (Squeeze 500g)", quantity: 0, purchasePrice: 5.5, shippingPrice: 7, localCost: 4, totalCost: 16.5, status: "Active" },
+      { productName: "beeswax 500g", quantity: 0, purchasePrice: 5.5, shippingPrice: 7, localCost: 6, totalCost: 18.5, status: "Active" },
+      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 8, shippingPrice: 7, localCost: 3, totalCost: 18, status: "Active" }
     ]
   },
   {
@@ -292,11 +292,11 @@ export const SEED_BATCHES: BatchSeed[] = [
     notes: "",
     items: [
       { productName: "Honey 1kg", quantity: 30, purchasePrice: 8, shippingPrice: 12, localCost: 5, totalCost: 25, status: "Active" },
-      { productName: "Honey 500g", quantity: 15, purchasePrice: 4, shippingPrice: 6, localCost: 2.5, totalCost: 12.5, status: "Active" },
-      { productName: "Honey 250g", quantity: 15, purchasePrice: 2, shippingPrice: 3, localCost: 2, totalCost: 7, status: "Active" },
-      { productName: "Honey (Squeeze 250g)", quantity: 10, purchasePrice: 2, shippingPrice: 3, localCost: 3.5, totalCost: 8.5, status: "Active" },
-      { productName: "Honey (Squeeze 500g)", quantity: 10, purchasePrice: 4, shippingPrice: 6, localCost: 4, totalCost: 14, status: "Active" },
-      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 5, purchasePrice: 14, shippingPrice: 6, localCost: 3, totalCost: 23, status: "Active" }
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 4, shippingPrice: 6, localCost: 2.5, totalCost: 12.5, status: "Active" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2, shippingPrice: 3, localCost: 2, totalCost: 7, status: "Active" },
+      { productName: "Honey (Squeeze 250g)", quantity: 0, purchasePrice: 2, shippingPrice: 3, localCost: 3.5, totalCost: 8.5, status: "Active" },
+      { productName: "Honey (Squeeze 500g)", quantity: 0, purchasePrice: 4, shippingPrice: 6, localCost: 4, totalCost: 14, status: "Active" },
+      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 14, shippingPrice: 6, localCost: 3, totalCost: 23, status: "Active" }
     ]
   }
 ];
