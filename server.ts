@@ -385,7 +385,7 @@ async function startServer() {
 
   // Listen exclusively
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Home Honey Engine] Full stack application loaded. Binding port ${PORT}.`);
+    console.log(`[Honey House Engine] Full stack application loaded. Binding port ${PORT}.`);
     console.log(`Point your browser to http://localhost:${PORT}`);
   });
 }

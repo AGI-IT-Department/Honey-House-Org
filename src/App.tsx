@@ -839,14 +839,81 @@ export default function App() {
         fixed inset-y-0 left-0 bg-white text-slate-700 flex flex-col flex-shrink-0 border-r border-slate-200 z-50 w-64 transform transition-transform duration-300 md:static md:translate-x-0
         ${menuOpen ? "translate-x-0" : "-translate-x-full md:flex"}
       `}>
-        <div className="p-6 border-b border-slate-200 flex justify-between items-center">
+        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-amber-50/15">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20 animate-pulse-slow">
-              🍯
-            </div>
+            {/* Custom SVG logo representing physical bait al asal / Honey House logo */}
+            <svg viewBox="0 0 100 100" className="w-11 h-11 flex-shrink-0">
+              <defs>
+                <linearGradient id="honeyGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fbbf24" />
+                  <stop offset="60%" stopColor="#d97706" />
+                  <stop offset="100%" stopColor="#b45309" />
+                </linearGradient>
+              </defs>
+              
+              {/* Dripping Honey Circular Frame (inspired by image) */}
+              <path 
+                d="M 50 10 
+                   C 72 10, 90 28, 90 50 
+                   C 90 55, 87 58, 88 64 
+                   C 89 71, 93 75, 89 81 
+                   C 85 87, 77 85, 72 87 
+                   C 67 89, 64 93, 59 92 
+                   C 54 91, 51 86, 46 88 
+                   C 41 90, 36 93, 31 91 
+                   C 25 89, 22 84, 18 79 
+                   C 14 74, 10 69, 14 61 
+                   C 16 56, 14 52, 14 47 
+                   C 14 27, 30 10, 50 10 Z" 
+                fill="none" 
+                stroke="url(#honeyGoldGrad)" 
+                strokeWidth="5" 
+                strokeLinecap="round" 
+              />
+              
+              {/* Splashes & Drips at Bottom */}
+              <path d="M 50 82 Q 50 96 48 97 Q 46 96 46 82" fill="none" stroke="url(#honeyGoldGrad)" strokeWidth="3.5" strokeLinecap="round" />
+              <path d="M 28 80 Q 23 88 21 89 Q 19 88 23 79" fill="none" stroke="url(#honeyGoldGrad)" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M 72 80 Q 77 88 79 87 Q 81 85 75 79" fill="none" stroke="url(#honeyGoldGrad)" strokeWidth="2.5" strokeLinecap="round" />
+
+              {/* House Outline (Amber-950) */}
+              <path 
+                d="M 33 49 L 50 32 L 67 49 
+                   M 38 43 L 38 68 L 62 68 L 62 43" 
+                fill="none" 
+                stroke="#451a03" 
+                strokeWidth="3.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+              />
+              <path d="M 57 38 L 57 33 L 60 33 L 60 41" fill="none" stroke="#451a03" strokeWidth="3.5" strokeLinecap="round" />
+
+              {/* Dome Beehive with layered honey segments */}
+              <g fill="url(#honeyGoldGrad)" stroke="#451a03" strokeWidth="1.5" strokeLinejoin="round">
+                <path d="M 43 64 C 43 65.5, 57 65.5, 57 64 C 57 62.5, 43 62.5, 43 64 Z" />
+                <path d="M 41 60 C 41 62, 59 62, 59 60 C 59 58, 41 58, 41 60 Z" />
+                <path d="M 39 56 C 39 58, 61 58, 61 56 C 61 54, 39 54, 39 56 Z" />
+                <path d="M 42 51 C 42 54, 58 54, 58 51 C 58 48, 42 48, 42 51 Z" />
+                <path d="M 46 47 C 46 49, 54 49, 54 47 C 54 45, 46 45, 46 47 Z" />
+              </g>
+              {/* Hive entrance */}
+              <circle cx="50" cy="56" r="2.5" fill="#451a03" />
+              
+              {/* Mini Flying Bee */}
+              <g transform="translate(64, 46) scale(1)">
+                <ellipse cx="0" cy="0" rx="4.5" ry="3.5" fill="#fbbf24" stroke="#451a03" strokeWidth="1" />
+                <path d="M -1.5 -3.2 L -1.5 3.2 M 1.5 -3.2 L 1.5 3.2" stroke="#451a03" strokeWidth="1" />
+                <ellipse cx="-1.2" cy="-4" rx="1.8" ry="2.5" fill="#ffffff" stroke="#451a03" strokeWidth="0.8" transform="rotate(-15)" opacity="0.95" />
+                <ellipse cx="1.2" cy="-4" rx="1.2" ry="2" fill="#ffffff" stroke="#451a03" strokeWidth="0.8" transform="rotate(15)" opacity="0.95" />
+                <path d="M 3.5 -1 Q 4.5 -2 4.2 -3" stroke="#451a03" strokeWidth="0.8" fill="none" />
+              </g>
+            </svg>
             <div>
-              <h1 className="font-bold text-lg leading-tight text-slate-900">Home Honey</h1>
-              <span className="text-xs text-blue-600 font-semibold tracking-wide uppercase">Core ERP v2</span>
+              <h1 className="font-bold text-lg leading-none text-slate-900 tracking-tight">Honey House</h1>
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-[10px] text-amber-600 font-bold tracking-wide uppercase">بيت العسل</span>
+                <span className="text-[8px] bg-amber-100 text-amber-800 font-extrabold px-1 py-0.2 rounded font-mono">CORE v2</span>
+              </div>
             </div>
           </div>
           <button 
@@ -943,7 +1010,7 @@ export default function App() {
                 {page === "dashboard" ? "Business Intelligence Dashboard" : `${page} modules`}
               </h2>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Real-time enterprise metrics for UAE Home Honey. Reconciled Local timezone.
+                Real-time enterprise metrics for UAE Honey House. Reconciled Local timezone.
               </p>
             </div>
           </div>
