@@ -19,7 +19,8 @@ import {
   Info,
   Scale,
   Edit2,
-  Tag
+  Tag,
+  ShoppingBag
 } from "lucide-react";
 
 // Product weight mapping in grams for frontend UI calculation
@@ -257,6 +258,8 @@ export default function App() {
   });
 
   // Edit Modals states
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editOrderObj, setEditOrderObj] = useState<OrderItem | null>(null);
   const [editCustomerObj, setEditCustomerObj] = useState<Customer | null>(null);
   const [editBatchId, setEditBatchId] = useState<string | null>(null);
@@ -601,7 +604,7 @@ export default function App() {
     }
   };
 
-  const selectSuggestedCustomer = (c: any) => {
+   const selectSuggestedCustomer = (c: any) => {
     setNewOrder(prev => ({
       ...prev,
       customerId: c["Customer ID"],
@@ -612,6 +615,55 @@ export default function App() {
     setCustomerSearchQuery("");
     setCustomerSearchDropdown([]);
     showToast(`Autofilled customer ${c["Customer Name"]} details!`, "success");
+  };
+
+  const openAddOrderModal = () => {
+    setNewOrder({
+      customerId: "",
+      customerName: "",
+      customerPhone: "",
+      customerLocation: "Dubai",
+      deliveryStatus: "Pending",
+      paymentStatus: "Unpaid",
+      orderDate: new Date().toISOString().split("T")[0],
+      products: [{ productName: "", quantity: 1, unitPrice: 0, costPrice: 0, batchId: "", availableQuantity: 0, maxWeight: 0 }]
+    });
+    setEditingOrderId(null);
+    setIsOrderModalOpen(true);
+  };
+
+  const handleEditClick = async (item: OrderItem) => {
+    try {
+      showToast("Loading order specifications...", "info");
+      const res = await fetch(`/api/batches/${item["Import Batch ID"]}/products`);
+      const list = await res.json();
+      
+      const loadedProduct = {
+        productName: item["Product"],
+        quantity: item["Quantity"],
+        unitPrice: item["Unit Price"],
+        costPrice: item["Cost Price"],
+        batchId: item["Import Batch ID"],
+        availableQuantity: (list.find((o: any) => o.product === item["Product"])?.availableQuantity || 0) + item["Quantity"],
+        maxWeight: (list.find((o: any) => o.product === item["Product"])?.availableWeight || 0) + ((PRODUCT_WEIGHTS[item["Product"]] || 0) * item["Quantity"] / 1000), 
+        availableProductsOptions: list
+      };
+
+      setNewOrder({
+        customerId: item["Customer ID"],
+        customerName: item["Customer Name (Auto)"],
+        customerPhone: item["Customer Phone (Auto)"],
+        customerLocation: item["Customer Location (Auto)"] || "Dubai",
+        deliveryStatus: item["Delivery Status"],
+        paymentStatus: item["Payment Status"],
+        orderDate: item["Order Date"],
+        products: [loadedProduct]
+      });
+      setEditingOrderId(item["Order ID"]);
+      setIsOrderModalOpen(true);
+    } catch (err) {
+      showToast("Error loading order item specs.", "danger");
+    }
   };
 
   const saveOrder = async (e: React.FormEvent) => {
@@ -627,21 +679,37 @@ export default function App() {
       return;
     }
 
-    // Assign customer_id if not present
-    const payload = {
+    const cid = newOrder.customerId || "CUST" + String(Date.now()).substring(7);
+
+    const payload = editingOrderId ? {
+      "Product": newOrder.products[0].productName,
+      "Quantity": newOrder.products[0].quantity,
+      "Unit Price": newOrder.products[0].unitPrice,
+      "Cost Price": newOrder.products[0].costPrice,
+      "Import Batch ID": newOrder.products[0].batchId,
+      "Order Date": newOrder.orderDate,
+      "Customer ID": cid,
+      "Customer Name (Auto)": newOrder.customerName,
+      "Customer Phone (Auto)": newOrder.customerPhone,
+      "Customer Location (Auto)": newOrder.customerLocation,
+      "Delivery Status": newOrder.deliveryStatus,
+      "Payment Status": newOrder.paymentStatus
+    } : {
       ...newOrder,
-      customerId: newOrder.customerId || "CUST" + String(Date.now()).substring(7)
+      customerId: cid
     };
 
     try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
+      const url = editingOrderId ? `/api/orders/${editingOrderId}` : "/api/orders";
+      const method = editingOrderId ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
-        showToast("Order transaction successfully submitted!", "success");
+        showToast(editingOrderId ? "Order successfully updated!" : "Order transaction successfully submitted!", "success");
         setNewOrder({
           customerId: "",
           customerName: "",
@@ -652,6 +720,8 @@ export default function App() {
           orderDate: new Date().toISOString().split("T")[0],
           products: [{ productName: "", quantity: 1, unitPrice: 0, costPrice: 0, batchId: "", availableQuantity: 0, maxWeight: 0 }]
         });
+        setEditingOrderId(null);
+        setIsOrderModalOpen(false);
         setOrdersTab("view");
         fetchOrders();
         fetchDashboardData();
@@ -1107,6 +1177,14 @@ export default function App() {
             <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200/80 px-3 py-1.5 rounded-full font-mono shadow-sm">
               UTC: {new Date().toISOString().split("T")[0]}
             </span>
+            <button
+              onClick={openAddOrderModal}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-blue-500/10"
+              title="Add a dynamic customer order immediately"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Order / طلب جديد</span>
+            </button>
           </div>
         </header>
 
@@ -1434,23 +1512,31 @@ export default function App() {
           <div className="space-y-6">
             
             {/* Embedded Order Tab Ribbon */}
-            <div className="flex border-b border-slate-200">
+            <div className="flex border-b border-slate-200 justify-between items-center pr-1 pb-1">
+              <div className="flex">
+                <button
+                  onClick={() => setOrdersTab("view")}
+                  className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
+                    ordersTab === "view" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"
+                  }`}
+                >
+                  All Orders Book
+                </button>
+                <button
+                  onClick={openAddOrderModal}
+                  className="px-6 py-3 font-semibold text-sm border-b-2 transition flex items-center gap-2 border-transparent text-slate-400 hover:text-slate-800"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create New Order</span>
+                </button>
+              </div>
+
               <button
-                onClick={() => setOrdersTab("view")}
-                className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
-                  ordersTab === "view" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"
-                }`}
+                onClick={openAddOrderModal}
+                className="bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-xs"
               >
-                All Orders Book
-              </button>
-              <button
-                onClick={() => setOrdersTab("create")}
-                className={`px-6 py-3 font-semibold text-sm border-b-2 transition flex items-center gap-2 ${
-                  ordersTab === "create" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"
-                }`}
-              >
-                <Plus className="w-4 h-4" />
-                <span>Create New Order</span>
+                <Plus className="w-3.5 h-3.5" />
+                <span>Quick Add Order / إضافة سريعة</span>
               </button>
             </div>
 
@@ -1621,12 +1707,23 @@ export default function App() {
                               </td>
                               <td className="p-4 font-mono font-semibold text-slate-500">{item["Import Batch ID"]}</td>
                               <td className="p-4 text-right whitespace-nowrap">
-                                <button
-                                  onClick={() => handleDeleteOrder(item["Order ID"])}
-                                  className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded-lg transition"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => handleEditClick(item)}
+                                    className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200/60 transition flex items-center gap-1 text-[10px] font-bold"
+                                    title="Edit Order / تعديل الطلب"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                    <span>تعديل</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteOrder(item["Order ID"])}
+                                    className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition"
+                                    title="Delete Order / حذف"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -1643,263 +1740,6 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* Sub-tab 2: CREATE NEW ORDER */}
-            {ordersTab === "create" && (
-              <form onSubmit={saveOrder} className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6 max-w-3xl">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-                    <Plus className="w-5 h-5 text-blue-600" />
-                    <span>Customer Details Summary</span>
-                  </h3>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Search Roster Customers</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Search className="w-4 h-4 text-slate-400" />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Filter database by name or phone to autofill..."
-                        value={customerSearchQuery}
-                        onChange={e => {
-                          setCustomerSearchQuery(e.target.value);
-                          handleCustomerSearchType(e.target.value);
-                        }}
-                        className="w-full bg-[#fafaf9] border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs"
-                      />
-                      {customerSearchDropdown.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl mt-1.5 overflow-hidden z-25 max-h-56 overflow-y-auto">
-                          {customerSearchDropdown.map((c, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => selectSuggestedCustomer(c)}
-                              className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 text-xs flex justify-between items-center transition"
-                            >
-                              <div>
-                                <p className="font-bold text-slate-900">{c["Customer Name"]}</p>
-                                <p className="text-[10px] text-slate-500 font-mono">{c["Customer Phone"]}</p>
-                              </div>
-                              <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-bold uppercase font-mono">Select</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Client Full Name *</label>
-                      <input
-                        type="text"
-                        value={newOrder.customerName}
-                        onChange={e => handleNewOrderChange("customerName", e.target.value)}
-                        required
-                        className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contact Phone *</label>
-                      <input
-                        type="text"
-                        value={newOrder.customerPhone}
-                        onChange={e => handleNewOrderChange("customerPhone", e.target.value)}
-                        required
-                        className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-semibold focus:bg-white transition"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Emirates Location *</label>
-                      <select
-                        value={newOrder.customerLocation}
-                        onChange={e => handleNewOrderChange("customerLocation", e.target.value)}
-                        className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
-                      >
-                        <option value="Dubai">Dubai</option>
-                        <option value="Sharjah">Sharjah</option>
-                        <option value="Ajman">Ajman</option>
-                        <option value="Abu Dhabi">Abu Dhabi</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Delivery Status</label>
-                      <select
-                        value={newOrder.deliveryStatus}
-                        onChange={e => handleNewOrderChange("deliveryStatus", e.target.value)}
-                        className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="Delivered">Delivered</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Payment Status</label>
-                      <select
-                        value={newOrder.paymentStatus}
-                        onChange={e => handleNewOrderChange("paymentStatus", e.target.value)}
-                        className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
-                      >
-                        <option value="Unpaid">Unpaid</option>
-                        <option value="Paid">Paid</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Scale className="w-5 h-5 text-blue-600" />
-                      <span>Items to purchase</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleAddProductRow}
-                      className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Item</span>
-                    </button>
-                  </h3>
-
-                  <div className="space-y-4">
-                    {newOrder.products.map((item, index) => {
-                      const avOptions: any[] = (item as any).availableProductsOptions || [];
-
-                      return (
-                        <div key={index} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/30 grid grid-cols-1 md:grid-cols-5 gap-3 items-end relative group">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Batch ID *</label>
-                            <select
-                              value={item.batchId}
-                              onChange={e => handleProductRowChange(index, "batchId", e.target.value)}
-                              required
-                              className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold"
-                            >
-                              <option value="">Select Batch</option>
-                              {batchIdsWithStatus.map(b => (
-                                <option key={b.batchId} value={b.batchId}>
-                                  {b.batchId} ({b.availableWeight.toFixed(1)} KG av.)
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Product *</label>
-                            <select
-                              value={item.productName}
-                              onChange={e => handleProductRowChange(index, "productName", e.target.value)}
-                              required
-                              className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold"
-                            >
-                              <option value="">Select product</option>
-                              {avOptions.map((opt, i) => (
-                                <option key={i} value={opt.product}>
-                                  {opt.product} ({opt.availableQuantity} units av.)
-                                </option>
-                              ))}
-                            </select>
-                            {item.costPrice > 0 && (
-                              <p className="text-[9px] text-emerald-600 font-bold mt-1.5 font-mono bg-emerald-50 px-1 py-0.5 rounded border border-emerald-150 inline-block">
-                                Unit Cost: {formatAED(item.costPrice)}
-                              </p>
-                            )}
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Quantity *</label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={item.availableQuantity || 9999}
-                              value={item.quantity}
-                              onChange={e => handleProductRowChange(index, "quantity", parseInt(e.target.value) || 1)}
-                              required
-                              className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold"
-                            />
-                            {item.availableQuantity > 0 && (
-                              <p className="text-[9px] text-blue-600 font-bold mt-0.5">Max allowed: {item.availableQuantity}</p>
-                            )}
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Selling Price *</label>
-                            <div className="relative">
-                              <input
-                                type="number"
-                                min={0}
-                                value={item.unitPrice}
-                                onChange={e => handleProductRowChange(index, "unitPrice", parseFloat(e.target.value) || 0)}
-                                required
-                                className="w-full bg-white border border-slate-200 rounded-lg pl-2.5 pr-8 py-1.5 text-xs font-mono font-bold"
-                              />
-                              <span className="absolute inset-y-0 right-2 flex items-center text-[9px] text-slate-400 font-bold">AED</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1">
-                              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Cost</span>
-                              <span className="text-xs font-bold font-mono text-slate-500 block py-1.5 px-0.5">
-                                {formatAED(item.quantity * item.unitPrice)}
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveProductRow(index)}
-                              className="text-slate-400 hover:text-rose-600 transition py-1.5"
-                            >
-                              <Trash2 className="w-4.5 h-4.5" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewOrder({
-                        customerId: "",
-                        customerName: "",
-                        customerPhone: "",
-                        customerLocation: "Dubai",
-                        deliveryStatus: "Pending",
-                        paymentStatus: "Unpaid",
-                        orderDate: new Date().toISOString().split("T")[0],
-                        products: [{ productName: "", quantity: 1, unitPrice: 0, costPrice: 0, batchId: "", availableQuantity: 0, maxWeight: 0 }]
-                      });
-                      setOrdersTab("view");
-                    }}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
-                  >
-                    Cancel Draft
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-blue-600 text-white hover:bg-blue-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition"
-                  >
-                    Book Order Transaction
-                  </button>
-                </div>
-              </form>
             )}
 
           </div>
@@ -2815,6 +2655,270 @@ export default function App() {
                       className="bg-blue-600 text-white hover:bg-blue-700 px-5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
                     >
                       Save Changes
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Modal - UNIFIED ORDER CREATION & EDITING Overlay */}
+            {isOrderModalOpen && (
+              <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in py-10">
+                <form 
+                  onSubmit={saveOrder} 
+                  className="bg-white p-8 rounded-2xl border border-slate-200 w-full max-w-4xl shadow-2xl space-y-6 animate-scale-up max-h-[90vh] overflow-y-auto"
+                >
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
+                      <ShoppingBag className="w-5 h-5 text-blue-600" />
+                      <span>{editingOrderId ? `Edit Customer Order / تعديل طلب [${editingOrderId}]` : "Create New Customer Order / طلب عميل جديد"}</span>
+                    </span>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setIsOrderModalOpen(false);
+                        setEditingOrderId(null);
+                      }} 
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Customer Details Summary */}
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Customer Details Summary</h3>
+                    
+                    {!editingOrderId && (
+                      <div className="mb-4">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Search Roster Customers</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Search className="w-4 h-4 text-slate-400" />
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="Filter database by name or phone to autofill..."
+                            value={customerSearchQuery}
+                            onChange={e => {
+                              setCustomerSearchQuery(e.target.value);
+                              handleCustomerSearchType(e.target.value);
+                            }}
+                            className="w-full bg-[#fafaf9] border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:bg-white transition"
+                          />
+                          {customerSearchDropdown.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl mt-1.5 overflow-hidden z-25 max-h-56 overflow-y-auto font-sans">
+                              {customerSearchDropdown.map((c, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => selectSuggestedCustomer(c)}
+                                  className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 text-xs flex justify-between items-center transition"
+                                >
+                                  <div>
+                                    <p className="font-bold text-slate-950">{c["Customer Name"]}</p>
+                                    <p className="text-[10px] text-slate-500 font-mono">{c["Customer Phone"]}</p>
+                                  </div>
+                                  <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-bold uppercase font-mono">Select</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Client Full Name *</label>
+                        <input
+                          type="text"
+                          value={newOrder.customerName}
+                          onChange={e => handleNewOrderChange("customerName", e.target.value)}
+                          required
+                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contact Phone *</label>
+                        <input
+                          type="text"
+                          value={newOrder.customerPhone}
+                          onChange={e => handleNewOrderChange("customerPhone", e.target.value)}
+                          required
+                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-semibold focus:bg-white transition"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Emirates Location *</label>
+                        <select
+                          value={newOrder.customerLocation}
+                          onChange={e => handleNewOrderChange("customerLocation", e.target.value)}
+                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
+                        >
+                          <option value="Dubai">Dubai</option>
+                          <option value="Sharjah">Sharjah</option>
+                          <option value="Ajman">Ajman</option>
+                          <option value="Abu Dhabi">Abu Dhabi</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Order Date *</label>
+                        <input
+                          type="date"
+                          value={newOrder.orderDate}
+                          onChange={e => handleNewOrderChange("orderDate", e.target.value)}
+                          required
+                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Delivery Status</label>
+                        <select
+                          value={newOrder.deliveryStatus}
+                          onChange={e => handleNewOrderChange("deliveryStatus", e.target.value)}
+                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="Delivered">Delivered</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Payment Status</label>
+                        <select
+                          value={newOrder.paymentStatus}
+                          onChange={e => handleNewOrderChange("paymentStatus", e.target.value)}
+                          className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold transition"
+                        >
+                          <option value="Unpaid">Unpaid</option>
+                          <option value="Paid">Paid</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Items to Purchase Section */}
+                  <div className="pt-4 border-t border-slate-100 font-sans">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
+                      <span>Items to purchase</span>
+                    </h3>
+
+                    <div className="space-y-4">
+                      {newOrder.products.map((item, index) => {
+                        const avOptions: any[] = (item as any).availableProductsOptions || [];
+                        const activeBatches = batchIdsWithStatus.filter(b => 
+                          b.availableWeight > 0 || item.batchId === b.batchId
+                        );
+
+                        return (
+                          <div key={index} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/30 grid grid-cols-1 md:grid-cols-5 gap-3 items-end relative">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Batch ID * (مع كمية)</label>
+                              <select
+                                value={item.batchId}
+                                onChange={e => handleProductRowChange(index, "batchId", e.target.value)}
+                                required
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                              >
+                                <option value="">Select Batch</option>
+                                {activeBatches.map(b => (
+                                  <option key={b.batchId} value={b.batchId}>
+                                    {b.batchId} ({b.availableWeight.toFixed(1)} KG av.)
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Product *</label>
+                              <select
+                                value={item.productName}
+                                onChange={e => handleProductRowChange(index, "productName", e.target.value)}
+                                required
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                              >
+                                <option value="">Select product</option>
+                                {avOptions.map((opt, i) => (
+                                  <option key={i} value={opt.product}>
+                                    {opt.product} ({opt.availableQuantity} units av.)
+                                  </option>
+                                ))}
+                              </select>
+                              {item.costPrice > 0 && (
+                                <p className="text-[9px] text-emerald-600 font-bold mt-1.5 font-mono bg-emerald-50 px-1 py-0.5 rounded border border-emerald-150 inline-block">
+                                  Unit Cost: {formatAED(item.costPrice)}
+                                </p>
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Quantity *</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={item.availableQuantity || 9999}
+                                value={item.quantity}
+                                onChange={e => handleProductRowChange(index, "quantity", parseInt(e.target.value) || 1)}
+                                required
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-blue-500"
+                              />
+                              {item.availableQuantity > 0 && (
+                                <p className="text-[9px] text-blue-600 font-bold mt-0.5">Max allowed: {item.availableQuantity}</p>
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Selling Price *</label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={item.unitPrice}
+                                  onChange={e => handleProductRowChange(index, "unitPrice", parseFloat(e.target.value) || 0)}
+                                  required
+                                  className="w-full bg-white border border-slate-200 rounded-lg pl-2.5 pr-8 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-blue-500"
+                                />
+                                <span className="absolute inset-y-0 right-2 flex items-center text-[9px] text-slate-400 font-bold">AED</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Cost</span>
+                                <span className="text-xs font-bold font-mono text-slate-500 block py-1.5 px-0.5">
+                                  {formatAED(item.quantity * item.unitPrice)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-slate-100 flex justify-end gap-3 font-sans">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsOrderModalOpen(false);
+                        setEditingOrderId(null);
+                      }}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
+                    >
+                      Cancel Draft
+                    </button>
+                    <button
+                      type="submit"
+                      className="bg-blue-600 text-white hover:bg-blue-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition"
+                    >
+                      {editingOrderId ? "Update & Save Order" : "Book Order Transaction"}
                     </button>
                   </div>
                 </form>
