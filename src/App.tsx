@@ -18,7 +18,8 @@ import {
   Sparkles,
   Info,
   Scale,
-  Edit2
+  Edit2,
+  Tag
 } from "lucide-react";
 
 // Product weight mapping in grams for frontend UI calculation
@@ -150,9 +151,14 @@ interface DashboardData {
 }
 
 export default function App() {
-  const [page, setPage] = useState<"dashboard" | "orders" | "batches" | "balance" | "customers">("dashboard");
+  const [page, setPage] = useState<"dashboard" | "orders" | "batches" | "balance" | "customers" | "products">("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
   
+  // Dynamic Catalog State
+  const [productsCatalog, setProductsCatalog] = useState<any[]>([]);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [newProductForm, setNewProductForm] = useState({ name: "", weight_g: 500, purchase_price: 10, selling_price: 25, notes: "" });
+
   // Navigation Tabs
   const [ordersTab, setOrdersTab] = useState<"view" | "create">("view");
   const [batchesTab, setBatchesTab] = useState<"view" | "create">("view");
@@ -227,7 +233,8 @@ export default function App() {
     flightDetails: "",
     arrivalDate: new Date().toISOString().split("T")[0],
     notes: "",
-    products: [{ productName: "Honey 1kg", quantity: 10, purchasePrice: 10, shippingCost: 5, localCost: 2 }]
+    totalWeight: 15.0,
+    products: []
   });
 
   const [newExpense, setNewExpense] = useState({
@@ -372,6 +379,74 @@ export default function App() {
     }
   };
 
+  const fetchProductsCatalog = async () => {
+    try {
+      const res = await fetch("/api/products");
+      const data = await res.json();
+      setProductsCatalog(data);
+    } catch (e) {
+      showToast("Error retrieving products catalog.", "danger");
+    }
+  };
+
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newProductForm)
+      });
+      if (res.ok) {
+        showToast("Product created successfully", "success");
+        setNewProductForm({ name: "", weight_g: 500, purchase_price: 10, selling_price: 25, notes: "" });
+        fetchProductsCatalog();
+      } else {
+        showToast("Failed to create product", "danger");
+      }
+    } catch {
+      showToast("Network error creating product", "danger");
+    }
+  };
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(editingProduct.name)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingProduct)
+      });
+      if (res.ok) {
+        showToast("Product updated successfully", "success");
+        setEditingProduct(null);
+        fetchProductsCatalog();
+      } else {
+        showToast("Failed to update product", "danger");
+      }
+    } catch {
+      showToast("Network error updating product", "danger");
+    }
+  };
+
+  const handleDeleteProduct = async (name: string) => {
+    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(name)}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        showToast("Product deleted successfully", "success");
+        fetchProductsCatalog();
+      } else {
+        showToast("Failed to delete product", "danger");
+      }
+    } catch {
+      showToast("Network error deleting product", "danger");
+    }
+  };
+
   const fetchStaticConfig = async () => {
     try {
       const [expCat, distCat, bIds] = await Promise.all([
@@ -405,6 +480,7 @@ export default function App() {
     fetchExpenses();
     fetchBalanceTransactions();
     fetchCustomers();
+    fetchProductsCatalog();
   }, []);
 
   // Update dates automatically when a Month value changes
@@ -450,6 +526,7 @@ export default function App() {
       fetchExpenses();
     }
     if (to === "customers") fetchCustomers();
+    if (to === "products") fetchProductsCatalog();
   };
 
   // ----------------------------------------------------
@@ -644,7 +721,8 @@ export default function App() {
           flightDetails: "",
           arrivalDate: new Date().toISOString().split("T")[0],
           notes: "",
-          products: [{ productName: "Honey 1kg", quantity: 10, purchasePrice: 10, shippingCost: 5, localCost: 2 }]
+          totalWeight: 15.0,
+          products: []
         });
         setBatchesTab("view");
         fetchBatches();
@@ -973,6 +1051,16 @@ export default function App() {
           >
             <Users className={`w-5 h-5 flex-shrink-0 ${page === "customers" ? "text-blue-600" : "text-slate-500"}`} />
             <span>Customers List</span>
+          </button>
+
+          <button
+            onClick={() => handlePageChange("products")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-sm font-medium ${
+              page === "products" ? "bg-blue-50 text-blue-600 shadow-sm shadow-blue-500/5 font-semibold" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+            }`}
+          >
+            <Tag className={`w-5 h-5 flex-shrink-0 ${page === "products" ? "text-blue-600" : "text-slate-500"}`} />
+            <span>Product Catalog</span>
           </button>
         </nav>
 
@@ -2086,119 +2174,25 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="pt-4">
-                  <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4 flex items-center justify-between">
-                    <span>Products packed in Batch</span>
-                    <button
-                      type="button"
-                      onClick={handleAddBatchProductRow}
-                      className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Item</span>
-                    </button>
-                  </h3>
-
-                  <div className="space-y-4">
-                    {newBatch.products.map((item, index) => (
-                      <div key={index} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/30 grid grid-cols-1 md:grid-cols-5 gap-3 items-end relative group">
-                        <div className="md:col-span-2">
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Honey Product Type *</label>
-                          <select
-                            value={item.productName}
-                            onChange={e => {
-                              const copy = [...newBatch.products];
-                              copy[index].productName = e.target.value;
-                              setNewBatch(prev => ({ ...prev, products: copy }));
-                            }}
-                            required
-                            className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold"
-                          >
-                            {Object.keys(PRODUCT_WEIGHTS).map(p => (
-                              <option key={p} value={p}>{p}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Quantity Box *</label>
-                          <input
-                            type="number"
-                            min={1}
-                            value={item.quantity}
-                            onChange={e => {
-                              const copy = [...newBatch.products];
-                              copy[index].quantity = parseInt(e.target.value) || 1;
-                              setNewBatch(prev => ({ ...prev, products: copy }));
-                            }}
-                            required
-                            className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Purchase Unit Cost *</label>
-                          <input
-                            type="number"
-                            value={item.purchasePrice}
-                            onChange={e => {
-                              const copy = [...newBatch.products];
-                              copy[index].purchasePrice = parseFloat(e.target.value) || 0;
-                              setNewBatch(prev => ({ ...prev, products: copy }));
-                            }}
-                            required
-                            className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1">
-                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Item Cost</span>
-                            <span className="text-xs font-bold font-mono text-slate-500 block py-1.5 px-0.5">
-                              {((item.purchasePrice + item.shippingCost + item.localCost) * item.quantity).toFixed(1)} AED
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveBatchProductRow(index)}
-                            className="text-slate-400 hover:text-rose-600 transition py-1.5 font-bold"
-                          >
-                            <Trash2 className="w-4.5 h-4.5" />
-                          </button>
-                        </div>
-
-                        {/* Extra Toll/Freight details expandable */}
-                        <div className="md:col-span-5 grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 pt-2 border-t border-dashed border-slate-200">
-                          <div>
-                            <span className="text-[9px] text-slate-400 font-bold block uppercase">Custom jars packing cost (Unit)</span>
-                            <input
-                              type="number"
-                              value={item.localCost}
-                              onChange={e => {
-                                const copy = [...newBatch.products];
-                                copy[index].localCost = parseFloat(e.target.value) || 0;
-                                setNewBatch(prev => ({ ...prev, products: copy }));
-                              }}
-                              className="bg-white border border-slate-200 rounded px-2 py-1 text-[10px] font-mono w-full"
-                            />
-                          </div>
-                          <div>
-                            <span className="text-[9px] text-slate-400 font-bold block uppercase">Flight cargo share (Unit)</span>
-                            <input
-                              type="number"
-                              value={item.shippingCost}
-                              onChange={e => {
-                                const copy = [...newBatch.products];
-                                copy[index].shippingCost = parseFloat(e.target.value) || 0;
-                                setNewBatch(prev => ({ ...prev, products: copy }));
-                              }}
-                              className="bg-white border border-slate-200 rounded px-2 py-1 text-[10px] font-mono w-full"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-5 border-t border-slate-100">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+                      <Scale className="w-4 h-4 text-amber-500" />
+                      <span>Batch Total Weight (KG) *</span>
+                      <span className="text-[#d97706] font-bold">الوزن الكلي للباتش</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      placeholder="e.g. 15.0"
+                      value={newBatch.totalWeight}
+                      onChange={e => setNewBatch(prev => ({ ...prev, totalWeight: parseFloat(e.target.value) || 0 }))}
+                      className="w-full bg-blue-50/30 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1 font-medium">
+                      All products catalog items will automatically be credited for this batch. Orders will deduct available stock weights dynamically.
+                    </p>
                   </div>
                 </div>
 
@@ -2826,6 +2820,273 @@ export default function App() {
                 </form>
               </div>
             )}
+
+          </div>
+        )}
+
+        {/* ----------------------------------------------------
+           PRODUCT CATALOG VIEW (قائمة وصيانة المنتجات)
+           ---------------------------------------------------- */}
+        {page === "products" && (
+          <div className="space-y-8 animate-fadeIn">
+            
+            {/* Header and Quick stats */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-amber-500" />
+                  <span>Product Catalog Management & Setup</span>
+                  <span className="text-amber-600 font-bold ml-1 text-sm bg-amber-50 px-2 py-0.5 rounded border border-amber-200">إدارة دليل المنتجات</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Define item weights (g) and default pricing. Added products automatically propagate through batches.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setNewProductForm({ name: "", weight_g: 500, purchase_price: 10, selling_price: 25, notes: "" });
+                  }}
+                  className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add New Product / إضافة منتج</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Catalog Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              
+              {/* Left Column: Form (Form is shown dynamically if adding/editing) */}
+              <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
+                  <span>{editingProduct ? "Edit Product Info" : "Create Product Setup"}</span>
+                  <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    {editingProduct ? "Modification" : "Insertion"}
+                  </span>
+                </h4>
+
+                <form onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Product Name * (اسم المنتج)</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Honey (Squeeze 400g)"
+                      value={editingProduct ? editingProduct.name : newProductForm.name}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (editingProduct) {
+                          setEditingProduct(prev => prev ? { ...prev, name: val } : null);
+                        } else {
+                          setNewProductForm(prev => ({ ...prev, name: val }));
+                        }
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (Grams) * (الوزن بالجرام)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        required
+                        placeholder="e.g. 500"
+                        value={editingProduct ? editingProduct.weight_g : newProductForm.weight_g}
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 0;
+                          if (editingProduct) {
+                            setEditingProduct(prev => prev ? { ...prev, weight_g: val } : null);
+                          } else {
+                            setNewProductForm(prev => ({ ...prev, weight_g: val }));
+                          }
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (KG) / بالكيلو</label>
+                      <div className="w-full bg-slate-100 border border-slate-200/60 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-400">
+                        {(((editingProduct ? editingProduct.weight_g : newProductForm.weight_g) || 0) / 1000).toFixed(3)} kg
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Purchase Price (AED) *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        required
+                        placeholder="e.g. 10.50"
+                        value={editingProduct ? editingProduct.purchase_price : newProductForm.purchase_price}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0;
+                          if (editingProduct) {
+                            setEditingProduct(prev => prev ? { ...prev, purchase_price: val } : null);
+                          } else {
+                            setNewProductForm(prev => ({ ...prev, purchase_price: val }));
+                          }
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Selling Price (AED) *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        required
+                        placeholder="e.g. 35.00"
+                        value={editingProduct ? editingProduct.selling_price : newProductForm.selling_price}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0;
+                          if (editingProduct) {
+                            setEditingProduct(prev => prev ? { ...prev, selling_price: val } : null);
+                          } else {
+                            setNewProductForm(prev => ({ ...prev, selling_price: val }));
+                          }
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Corporate Catalog Notes</label>
+                    <textarea
+                      placeholder="Product packaging, batch constraints..."
+                      rows={2}
+                      value={editingProduct ? editingProduct.notes || "" : newProductForm.notes || ""}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (editingProduct) {
+                          setEditingProduct(prev => prev ? { ...prev, notes: val } : null);
+                        } else {
+                          setNewProductForm(prev => ({ ...prev, notes: val }));
+                        }
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                    />
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
+                    {editingProduct && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingProduct(null);
+                        }}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold transition"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl font-extrabold shadow-sm transition"
+                    >
+                      {editingProduct ? "Save Changes" : "Create Product"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Right Column: Catalog Grid Table */}
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+                <div>
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-700 tracking-wider uppercase">Active Enterprise Products Catalog</span>
+                    <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full font-bold">
+                      {productsCatalog.length} products total
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50/30 text-slate-500 uppercase tracking-widest text-[9px] font-extrabold border-b border-slate-100">
+                          <th className="px-6 py-3.5">Product Details & Specs</th>
+                          <th className="px-5 py-3.5">Weight (g)</th>
+                          <th className="px-5 py-3.5">Purchase price</th>
+                          <th className="px-5 py-3.5">Standard Sell</th>
+                          <th className="px-5 py-3.5">Default profit</th>
+                          <th className="px-6 py-3.5 text-right w-[140px]">Operations</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                        {productsCatalog.map((prod, idx) => {
+                          const profit = prod.selling_price - prod.purchase_price;
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/50 transition">
+                              <td className="px-6 py-4">
+                                <div className="font-bold text-slate-900 text-xs">{prod.name}</div>
+                                {prod.notes && (
+                                  <div className="text-[10px] text-slate-400 mt-0.5 font-normal line-clamp-1">{prod.notes}</div>
+                                )}
+                              </td>
+                              <td className="px-5 py-4 font-mono font-semibold text-slate-600 text-xs">
+                                {prod.weight_g}g ({prod.weight_g / 1000} kg)
+                              </td>
+                              <td className="px-5 py-4 font-mono text-amber-600 text-xs">
+                                {prod.purchase_price.toFixed(2)} AED
+                              </td>
+                              <td className="px-5 py-4 font-mono text-emerald-600 text-xs">
+                                {prod.selling_price.toFixed(2)} AED
+                              </td>
+                              <td className="px-5 py-4 font-mono">
+                                <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                  +{profit.toFixed(2)} AED
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingProduct(prod);
+                                    }}
+                                    className="p-1 px-2 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-bold flex items-center gap-1 transition"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                    <span>Edit</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteProduct(prod.name)}
+                                    className="p-1 px-2 text-rose-700 hover:bg-rose-50 border border-rose-250 rounded transition text-[10px] font-bold"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {productsCatalog.length === 0 && (
+                  <div className="text-center py-12 font-bold text-slate-400">
+                    No products present in database catalog. Please define a custom product setup.
+                  </div>
+                )}
+              </div>
+
+            </div>
 
           </div>
         )}

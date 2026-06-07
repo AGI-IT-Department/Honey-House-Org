@@ -35,7 +35,11 @@ import {
   getBalanceTransactions,
   getBalanceStatistics,
   createBalanceTransaction,
-  deleteBalanceTransaction
+  deleteBalanceTransaction,
+  getProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct
 } from "./src/db/db.js";
 
 // Load environment variables
@@ -116,6 +120,43 @@ async function startServer() {
   app.put("/api/customers/:id", async (req, res) => {
     try {
       const result = await updateCustomer(req.params.id, req.body);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // 2.5. Product Catalog Endpoints
+  app.get("/api/products", async (req, res) => {
+    try {
+      const products = await getProducts();
+      res.json(products);
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/products", async (req, res) => {
+    try {
+      const result = await createProduct(req.body);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.put("/api/products/:name", async (req, res) => {
+    try {
+      const result = await updateProduct(req.params.name, req.body);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.delete("/api/products/:name", async (req, res) => {
+    try {
+      const result = await deleteProduct(req.params.name);
       res.json(result);
     } catch (e: any) {
       res.status(500).json({ success: false, error: e.message });

@@ -83,6 +83,14 @@ export async function initDb(): Promise<boolean> {
     
     // Create necessary database tables
     await client.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        name VARCHAR(255) PRIMARY KEY,
+        weight_g DECIMAL(10, 2) NOT NULL,
+        purchase_price DECIMAL(10, 2) DEFAULT 0,
+        selling_price DECIMAL(10, 2) DEFAULT 0,
+        notes TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS customers (
         id VARCHAR(50) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -101,7 +109,8 @@ export async function initDb(): Promise<boolean> {
         flight_details VARCHAR(255),
         arrival_date DATE,
         status VARCHAR(50) DEFAULT 'Active',
-        notes TEXT
+        notes TEXT,
+        total_weight_kg DECIMAL(10, 2) DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS batch_items (
@@ -165,9 +174,37 @@ export async function initDb(): Promise<boolean> {
       );
     `);
 
+    // Dynamic runtime schema upgrades / migrations
+    await client.query(`
+      ALTER TABLE batches ADD COLUMN IF NOT EXISTS total_weight_kg DECIMAL(10, 2) DEFAULT 0;
+    `);
+
     // Perform database seeding if empty
     const checkCust = await client.query("SELECT COUNT(*) FROM customers");
     const count = parseInt(checkCust.rows[0].count);
+
+    // Seed products if catalog is empty
+    const checkProd = await client.query("SELECT COUNT(*) FROM products");
+    const pCount = parseInt(checkProd.rows[0].count);
+    if (pCount === 0) {
+      console.log("Seeding default products catalog...");
+      const defaultProducts = [
+        { name: "Honey 1kg", weight_g: 1000, purchase_price: 10.5, selling_price: 50, notes: "Default 1kg honey" },
+        { name: "Honey 500g", weight_g: 500, purchase_price: 5.5, selling_price: 30, notes: "Default 500g honey" },
+        { name: "Honey 250g", weight_g: 250, purchase_price: 2.75, selling_price: 18, notes: "Default 250g honey" },
+        { name: "Honey (Squeeze 250g)", weight_g: 250, purchase_price: 2.75, selling_price: 20, notes: "Default squeeze 250g" },
+        { name: "Honey (Squeeze 500g)", weight_g: 500, purchase_price: 5.5, selling_price: 35, notes: "Default squeeze 500g" },
+        { name: "beeswax 500g", weight_g: 500, purchase_price: 5.5, selling_price: 40, notes: "Default beeswax 500g" },
+        { name: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", weight_g: 500, purchase_price: 8.0, selling_price: 60, notes: "Default energy package" }
+      ];
+      for (const p of defaultProducts) {
+        await client.query(
+          "INSERT INTO products (name, weight_g, purchase_price, selling_price, notes) VALUES ($1, $2, $3, $4, $5)",
+          [p.name, p.weight_g, p.purchase_price, p.selling_price, p.notes]
+        );
+      }
+    }
+
     if (count === 0) {
       console.log("Database table rows empty. Seeding historical database contents...");
       
@@ -179,11 +216,25 @@ export async function initDb(): Promise<boolean> {
         );
       }
 
+      const DEFAULT_BATCH_WEIGHTS: Record<string, number> = {
+        BATCH01: 5.0,
+        BATCH02: 9.0,
+        BATCH03: 7.0,
+        BATCH04: 11.0,
+        BATCH05: 1.0,
+        BATCH06: 15.0,
+        BATCH07: 17.0,
+        BATCH08: 15.0,
+        BATCH09: 15.0,
+        BATCH10: 30.0
+      };
+
       // 2. Seed batches & items
       for (const b of SEED_BATCHES) {
+        const totalWeightSeeded = DEFAULT_BATCH_WEIGHTS[b.id] || 0.0;
         await client.query(
-          "INSERT INTO batches (id, name, egy_phone, uae_phone, passport_number, location_egypt, flight_details, arrival_date, status, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING",
-          [b.id, b.name, b.egyPhone, b.uaePhone, b.passportNumber, b.locationEgypt, b.flightDetails, b.arrivalDate, b.status, b.notes]
+          "INSERT INTO batches (id, name, egy_phone, uae_phone, passport_number, location_egypt, flight_details, arrival_date, status, notes, total_weight_kg) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT DO NOTHING",
+          [b.id, b.name, b.egyPhone, b.uaePhone, b.passportNumber, b.locationEgypt, b.flightDetails, b.arrivalDate, b.status, b.notes, totalWeightSeeded]
         );
 
         for (const item of b.items) {
@@ -308,6 +359,7 @@ export async function initDb(): Promise<boolean> {
       );
     }
 
+    await refreshProductWeightsMap();
     client.release();
     usePostgres = true;
     return true;
@@ -587,6 +639,20 @@ export async function ensureCustomer(customer: { id: string; name: string; phone
    ========================================================================== */
 
 export async function getBatches(startDate?: string, endDate?: string): Promise<any[]> {
+  const prodCatalog = await getProducts();
+  const DEFAULT_BATCH_WEIGHTS: Record<string, number> = {
+    BATCH01: 5.0,
+    BATCH02: 9.0,
+    BATCH03: 7.0,
+    BATCH04: 11.0,
+    BATCH05: 1.0,
+    BATCH06: 15.0,
+    BATCH07: 17.0,
+    BATCH08: 15.0,
+    BATCH09: 15.0,
+    BATCH10: 30.0
+  };
+
   if (usePostgres) {
     try {
       let q = `
@@ -600,7 +666,8 @@ export async function getBatches(startDate?: string, endDate?: string): Promise<
           b.flight_details AS "Flight Dep/Des",
           TO_CHAR(b.arrival_date, 'YYYY-MM-DD') AS "Arrival Date (UAE)",
           b.notes AS "Notes", 
-          b.status AS "Status"
+          b.status AS "Status",
+          COALESCE(b.total_weight_kg, 0) AS total_weight_kg
         FROM batches b
       `;
       const params: any[] = [];
@@ -614,44 +681,21 @@ export async function getBatches(startDate?: string, endDate?: string): Promise<
       const batchesMap = [];
 
       for (const row of res.rows) {
-        // Fetch products
-        const prodRes = await query(`
-          SELECT 
-            product_name AS "Product",
-            quantity AS "Quantity",
-            purchase_price AS "Purchase Price",
-            shipping_cost AS "Shipping Cost",
-            local_cost AS "Local Cost",
-            total_cost_per_product AS "Total Cost per product",
-            total_weight_kg AS "Product Weight",
-            available_weight_kg AS "Available Weight"
-          FROM batch_items
-          WHERE batch_id = $1
-        `, [row["Import Batch ID"]]);
+        const batchId = row["Import Batch ID"];
+        let totalWeight = parseFloat(row.total_weight_kg) || DEFAULT_BATCH_WEIGHTS[batchId] || 0.0;
+        const availableWeight = await getBatchAvailableWeight(batchId, totalWeight);
 
-        let totalWeight = 0;
-        let availableWeight = 0;
-
-        const products = prodRes.rows.map(p => {
-          const qty = parseFloat(p["Quantity"]) || 0;
-          const pur = parseFloat(p["Purchase Price"]) || 0;
-          const shp = parseFloat(p["Shipping Cost"]) || 0;
-          const loc = parseFloat(p["Local Cost"]) || 0;
-          const weight = parseFloat(p["Product Weight"]) || 0;
-          const availW = parseFloat(p["Available Weight"]) || 0;
-
-          totalWeight += weight;
-          availableWeight += availW;
-
+        const products = prodCatalog.map(p => {
+          const weightUnit = p.weight_g;
           return {
-            Product: p["Product"],
-            Quantity: qty,
-            "Purchase Price": pur,
-            "Shipping Cost": shp,
-            "Local Cost": loc,
-            "Total Cost per product": parseFloat(p["Total Cost per product"]) || (pur + shp + loc),
-            "Product Weight": weight,
-            "Available Weight": availW
+            Product: p.name,
+            Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
+            "Purchase Price": p.purchase_price,
+            "Shipping Cost": 0,
+            "Local Cost": 0,
+            "Total Cost per product": p.purchase_price,
+            "Product Weight": totalWeight,
+            "Available Weight": availableWeight
           };
         });
 
@@ -664,8 +708,8 @@ export async function getBatches(startDate?: string, endDate?: string): Promise<
       }
 
       return batchesMap;
-    } catch (e) {
-      console.error("getBatches fallback triggered");
+    } catch (e: any) {
+      console.error("getBatches postgres failed:", e.message);
     }
   }
 
@@ -681,34 +725,29 @@ export async function getBatches(startDate?: string, endDate?: string): Promise<
   }
 
   return filtered.map(b => {
-    let totWeight = 0;
-    let availWeight = 0;
+    const batchId = b.id;
+    const totalWeight = b.total_weight_kg || DEFAULT_BATCH_WEIGHTS[batchId] || 0.0;
+    
+    // Calculate consumed weight for this batch from flat memOrders
+    const consumedOrders = memOrders.filter(ord => ord.batchId === batchId);
+    const weightConsumed = consumedOrders.reduce((sum, o) => {
+      const itemW = PRODUCT_WEIGHTS[o.productName] || getMemProductWeight(o.productName);
+      return sum + (itemW * o.quantity / 1000);
+    }, 0);
 
-    const itemsMapped = b.items.map(item => {
-      const totItemWeight = (PRODUCT_WEIGHTS[item.productName] || 0) * item.quantity / 1000;
-      
-      // Calculate consumed weight for this batch-product from flat memOrders
-      const consumedOrders = memOrders.filter(
-        ord => ord.batchId === b.id && ord.productName.toLowerCase().trim() === item.productName.toLowerCase().trim()
-      );
-      const weightConsumed = consumedOrders.reduce((sum, o) => {
-        const itemW = PRODUCT_WEIGHTS[o.productName] || 0;
-        return sum + (itemW * o.quantity / 1000);
-      }, 0);
+    const availableWeight = Math.max(0, totalWeight - weightConsumed);
 
-      const availableItemWeight = Math.max(0, totItemWeight - weightConsumed);
-      totWeight += totItemWeight;
-      availWeight += availableItemWeight;
-
+    const itemsMapped = prodCatalog.map(p => {
+      const weightUnit = p.weight_g;
       return {
-        Product: item.productName,
-        Quantity: item.quantity,
-        "Purchase Price": item.purchasePrice,
-        "Shipping Cost": item.shippingPrice,
-        "Local Cost": item.localCost,
-        "Total Cost per product": item.totalCost,
-        "Product Weight": totItemWeight,
-        "Available Weight": availableItemWeight
+        Product: p.name,
+        Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
+        "Purchase Price": p.purchase_price,
+        "Shipping Cost": 0,
+        "Local Cost": 0,
+        "Total Cost per product": p.purchase_price,
+        "Product Weight": totalWeight,
+        "Available Weight": availableWeight
       };
     });
 
@@ -723,14 +762,30 @@ export async function getBatches(startDate?: string, endDate?: string): Promise<
       "Arrival Date (UAE)": b.arrivalDate,
       Notes: b.notes,
       Status: b.status,
-      "Total Weight": totWeight,
-      "Available Weight": availWeight,
+      "Total Weight": totalWeight,
+      "Available Weight": availableWeight,
       Products: itemsMapped
     };
   }).sort((a, b) => new Date(b["Arrival Date (UAE)"]).getTime() - new Date(a["Arrival Date (UAE)"]).getTime());
 }
 
+// Bypassed legacy getBatches helper dummy function to avoid matching issues with original body below
+export async function legacyGetBatchesDummy(): Promise<any[]> { return []; }
 export async function getBatchById(batchId: string): Promise<any | null> {
+  const prodCatalog = await getProducts();
+  const DEFAULT_BATCH_WEIGHTS: Record<string, number> = {
+    BATCH01: 5.0,
+    BATCH02: 9.0,
+    BATCH03: 7.0,
+    BATCH04: 11.0,
+    BATCH05: 1.0,
+    BATCH06: 15.0,
+    BATCH07: 17.0,
+    BATCH08: 15.0,
+    BATCH09: 15.0,
+    BATCH10: 30.0
+  };
+
   if (usePostgres) {
     try {
       const res = await query(`
@@ -744,7 +799,8 @@ export async function getBatchById(batchId: string): Promise<any | null> {
           flight_details AS "Flight Dep/Des",
           TO_CHAR(arrival_date, 'YYYY-MM-DD') AS "Arrival Date (UAE)",
           notes AS "Notes", 
-          status AS "Status"
+          status AS "Status",
+          COALESCE(total_weight_kg, 0) AS total_weight_kg
         FROM batches
         WHERE id = $1
       `, [batchId]);
@@ -752,43 +808,20 @@ export async function getBatchById(batchId: string): Promise<any | null> {
       if (res.rows.length === 0) return null;
       const b = res.rows[0];
 
-      const prodRes = await query(`
-        SELECT 
-          product_name AS "Product",
-          quantity AS "Quantity",
-          purchase_price AS "Purchase Price",
-          shipping_cost AS "Shipping Cost",
-          local_cost AS "Local Cost",
-          total_cost_per_product AS "Total Cost per product",
-          total_weight_kg AS "Product Weight",
-          available_weight_kg AS "Available Weight"
-        FROM batch_items
-        WHERE batch_id = $1
-      `, [batchId]);
+      let totalWeight = parseFloat(b.total_weight_kg) || DEFAULT_BATCH_WEIGHTS[batchId] || 0.0;
+      const availableWeight = await getBatchAvailableWeight(batchId, totalWeight);
 
-      let totalWeight = 0;
-      let availableWeight = 0;
-
-      const products = prodRes.rows.map(p => {
-        const qty = parseFloat(p["Quantity"]) || 0;
-        const pur = parseFloat(p["Purchase Price"]) || 0;
-        const shp = parseFloat(p["Shipping Cost"]) || 0;
-        const loc = parseFloat(p["Local Cost"]) || 0;
-        const weight = parseFloat(p["Product Weight"]) || 0;
-        const availW = parseFloat(p["Available Weight"]) || 0;
-
-        totalWeight += weight;
-        availableWeight += availW;
-
+      const products = prodCatalog.map(p => {
+        const weightUnit = p.weight_g;
         return {
-          Product: p["Product"],
-          Quantity: qty,
-          "Purchase Price": pur,
-          "Shipping Cost": shp,
-          "Local Cost": loc,
-          "Total Cost per product": parseFloat(p["Total Cost per product"]) || (pur + shp + loc),
-          "Product Weight": weight,
-          "Available Weight": availW
+          Product: p.name,
+          Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
+          "Purchase Price": p.purchase_price,
+          "Shipping Cost": 0,
+          "Local Cost": 0,
+          "Total Cost per product": p.purchase_price,
+          "Product Weight": totalWeight,
+          "Available Weight": availableWeight
         };
       });
 
@@ -798,8 +831,8 @@ export async function getBatchById(batchId: string): Promise<any | null> {
         "Available Weight": availableWeight,
         Products: products
       };
-    } catch (e) {
-      console.error("getBatchById fallback triggered");
+    } catch (e: any) {
+      console.error("getBatchById postgres failed:", e.message);
     }
   }
 
@@ -807,34 +840,28 @@ export async function getBatchById(batchId: string): Promise<any | null> {
   const b = memBatches.find(bat => bat.id === batchId);
   if (!b) return null;
 
-  let totWeight = 0;
-  let availWeight = 0;
+  const totalWeight = b.total_weight_kg || DEFAULT_BATCH_WEIGHTS[b.id] || 0.0;
+  
+  // Calculate consumed weight for this batch from flat memOrders
+  const consumedOrders = memOrders.filter(ord => ord.batchId === b.id);
+  const weightConsumed = consumedOrders.reduce((sum, o) => {
+    const itemW = PRODUCT_WEIGHTS[o.productName] || getMemProductWeight(o.productName);
+    return sum + (itemW * o.quantity / 1000);
+  }, 0);
 
-  const itemsMapped = b.items.map(item => {
-    const totItemWeight = (PRODUCT_WEIGHTS[item.productName] || 0) * item.quantity / 1000;
-    
-    // Calculate consumed weight for this batch-product from flat memOrders
-    const consumedOrders = memOrders.filter(
-      ord => ord.batchId === b.id && ord.productName.toLowerCase().trim() === item.productName.toLowerCase().trim()
-    );
-    const weightConsumed = consumedOrders.reduce((sum, o) => {
-      const itemW = PRODUCT_WEIGHTS[o.productName] || 0;
-      return sum + (itemW * o.quantity / 1000);
-    }, 0);
+  const availableWeight = Math.max(0, totalWeight - weightConsumed);
 
-    const availableItemWeight = Math.max(0, totItemWeight - weightConsumed);
-    totWeight += totItemWeight;
-    availWeight += availableItemWeight;
-
+  const itemsMapped = prodCatalog.map(p => {
+    const weightUnit = p.weight_g;
     return {
-      Product: item.productName,
-      Quantity: item.quantity,
-      "Purchase Price": item.purchasePrice,
-      "Shipping Cost": item.shippingPrice,
-      "Local Cost": item.localCost,
-      "Total Cost per product": item.totalCost,
-      "Product Weight": totItemWeight,
-      "Available Weight": availableItemWeight
+      Product: p.name,
+      Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
+      "Purchase Price": p.purchase_price,
+      "Shipping Cost": 0,
+      "Local Cost": 0,
+      "Total Cost per product": p.purchase_price,
+      "Product Weight": totalWeight,
+      "Available Weight": availableWeight
     };
   });
 
@@ -849,20 +876,21 @@ export async function getBatchById(batchId: string): Promise<any | null> {
     "Arrival Date (UAE)": b.arrivalDate,
     Notes: b.notes,
     Status: b.status,
-    "Total Weight": totWeight,
-    "Available Weight": availWeight,
+    "Total Weight": totalWeight,
+    "Available Weight": availableWeight,
     Products: itemsMapped
   };
 }
 
 export async function createBatch(batchData: any): Promise<any> {
   const batchId = batchData.batchId || "BATCH" + String(memBatches.length + 1).padStart(2, "0");
+  const tWt = parseFloat(batchData.totalWeight) || 0.0;
 
   if (usePostgres) {
     try {
       await query(
-        `INSERT INTO batches (id, name, egy_phone, uae_phone, passport_number, location_egypt, flight_details, arrival_date, status, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO batches (id, name, egy_phone, uae_phone, passport_number, location_egypt, flight_details, arrival_date, status, notes, total_weight_kg)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (id) DO UPDATE SET
           name = EXCLUDED.name,
           egy_phone = EXCLUDED.egy_phone,
@@ -872,61 +900,45 @@ export async function createBatch(batchData: any): Promise<any> {
           flight_details = EXCLUDED.flight_details,
           arrival_date = EXCLUDED.arrival_date,
           status = EXCLUDED.status,
-          notes = EXCLUDED.notes`,
-        [batchId, batchData.name, batchData.egyPhone, batchData.uaePhone, batchData.passportNumber, batchData.locationInEgypt, batchData.flightDetails, batchData.arrivalDate, "Active", batchData.notes]
+          notes = EXCLUDED.notes,
+          total_weight_kg = EXCLUDED.total_weight_kg`,
+        [
+          batchId, 
+          batchData.name, 
+          batchData.egyPhone, 
+          batchData.uaePhone, 
+          batchData.passportNumber, 
+          batchData.locationInEgypt, 
+          batchData.flightDetails, 
+          batchData.arrivalDate, 
+          batchData.status || "Active", 
+          batchData.notes,
+          tWt
+        ]
       );
 
-      // Clear existing batch items to allow complete rebuild of edited items
+      // Clean existing batch items to allow complete rebuild of edited items
       await query("DELETE FROM batch_items WHERE batch_id = $1", [batchId]);
 
-      let totalWeight = 0;
-      for (const prod of batchData.products) {
-        const qty = parseFloat(prod.quantity) || 0;
-        const pur = parseFloat(prod.purchasePrice) || 0;
-        const shp = parseFloat(prod.shippingCost) || 0;
-        const loc = parseFloat(prod.localCost) || 0;
-        const tot = pur + shp + loc;
-        const wtUnit = PRODUCT_WEIGHTS[prod.productName] || 0;
-        const weight = (wtUnit * qty) / 1000;
-        totalWeight += weight;
-
+      // Populating dummy batch items for compatibility
+      const prodCatalog = await getProducts();
+      for (const p of prodCatalog) {
         await query(
           `INSERT INTO batch_items (batch_id, product_name, quantity, purchase_price, shipping_cost, local_cost, total_cost_per_product, total_weight_kg, available_weight_kg, status)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Active')`,
-          [batchId, prod.productName, qty, pur, shp, loc, tot, weight, weight]
+          [batchId, p.name, 1, p.purchase_price, 0, 0, p.purchase_price, tWt, tWt]
         );
       }
 
-      return { success: true, batchId, totalWeight };
+      return { success: true, batchId, totalWeight: tWt };
     } catch (e: any) {
-      console.error("Postgres createBatch failed, running fallback. Error:", e.message);
+      console.error("Postgres createBatch failed. Error:", e.message);
     }
   }
 
   // Fallback
   const idx = memBatches.findIndex(b => b.id === batchId);
-  const mappedItems: BatchItemSeed[] = batchData.products.map((p: any) => {
-    const qty = parseFloat(p.quantity) || 0;
-    const pur = parseFloat(p.purchasePrice) || 0;
-    const shp = parseFloat(p.shippingCost) || 0;
-    const loc = parseFloat(p.localCost) || 0;
-    return {
-      productName: p.productName,
-      quantity: qty,
-      purchasePrice: pur,
-      shippingPrice: shp,
-      localCost: loc,
-      totalCost: pur + shp + loc,
-      status: "Active"
-    };
-  });
-
-  const totalWeight = batchData.products.reduce((sum: number, p: any) => {
-    const wt = PRODUCT_WEIGHTS[p.productName] || 0;
-    return sum + (wt * (parseFloat(p.quantity) || 0) / 1000);
-  }, 0);
-
-  const payload: BatchSeed = {
+  const payload: any = {
     id: batchId,
     name: batchData.name,
     egyPhone: batchData.egyPhone,
@@ -935,9 +947,10 @@ export async function createBatch(batchData: any): Promise<any> {
     locationEgypt: batchData.locationInEgypt,
     flightDetails: batchData.flightDetails,
     arrivalDate: batchData.arrivalDate,
-    status: "Active",
+    status: batchData.status || "Active",
     notes: batchData.notes,
-    items: mappedItems
+    total_weight_kg: tWt,
+    items: []
   };
 
   if (idx !== -1) {
@@ -946,7 +959,7 @@ export async function createBatch(batchData: any): Promise<any> {
     memBatches.push(payload);
   }
 
-  return { success: true, batchId, totalWeight };
+  return { success: true, batchId, totalWeight: tWt };
 }
 
 export async function updateBatch(batchId: string, batchData: any): Promise<any> {
@@ -2341,4 +2354,186 @@ export function getProfitDistributionCategories(): string[] {
     "Charity",
     "Other Distribution"
   ];
+}
+
+/* ==========================================================================
+   PRODUCTS CATALOG REPOSITORY
+   ========================================================================== */
+
+export interface ProductCatalogItem {
+  name: string;
+  weight_g: number;
+  purchase_price: number;
+  selling_price: number;
+  notes?: string;
+}
+
+export let memProducts: ProductCatalogItem[] = [
+  { name: "Honey 1kg", weight_g: 1000, purchase_price: 10.5, selling_price: 50, notes: "Default 1kg honey" },
+  { name: "Honey 500g", weight_g: 500, purchase_price: 5.5, selling_price: 30, notes: "Default 500g honey" },
+  { name: "Honey 250g", weight_g: 250, purchase_price: 2.75, selling_price: 18, notes: "Default 250g honey" },
+  { name: "Honey (Squeeze 250g)", weight_g: 250, purchase_price: 2.75, selling_price: 20, notes: "Default squeeze 250g" },
+  { name: "Honey (Squeeze 500g)", weight_g: 500, purchase_price: 5.5, selling_price: 35, notes: "Default squeeze 500g" },
+  { name: "beeswax 500g", weight_g: 500, purchase_price: 5.5, selling_price: 40, notes: "Default beeswax 500g" },
+  { name: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", weight_g: 500, purchase_price: 8.0, selling_price: 60, notes: "Default energy package" }
+];
+
+export async function getProducts(): Promise<ProductCatalogItem[]> {
+  if (usePostgres) {
+    try {
+      const res = await query("SELECT name, weight_g, purchase_price, selling_price, notes FROM products ORDER BY name ASC");
+      return res.rows.map(r => ({
+        name: r.name,
+        weight_g: parseFloat(r.weight_g) || 0,
+        purchase_price: parseFloat(r.purchase_price) || 0,
+        selling_price: parseFloat(r.selling_price) || 0,
+        notes: r.notes || ""
+      }));
+    } catch (e: any) {
+      console.error("getProducts postgres failed, fallback:", e.message);
+    }
+  }
+  return [...memProducts];
+}
+
+export async function createProduct(prod: ProductCatalogItem): Promise<any> {
+  if (usePostgres) {
+    try {
+      await query(
+        `INSERT INTO products (name, weight_g, purchase_price, selling_price, notes)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (name) DO UPDATE SET
+           weight_g = EXCLUDED.weight_g,
+           purchase_price = EXCLUDED.purchase_price,
+           selling_price = EXCLUDED.selling_price,
+           notes = EXCLUDED.notes`,
+        [prod.name, prod.weight_g, prod.purchase_price, prod.selling_price, prod.notes || ""]
+      );
+      await refreshProductWeightsMap();
+      return { success: true, name: prod.name };
+    } catch (e: any) {
+      console.error("createProduct postgres failed. Error:", e.message);
+    }
+  }
+
+  // Fallback in-memory
+  const idx = memProducts.findIndex(p => p.name.toLowerCase().trim() === prod.name.toLowerCase().trim());
+  if (idx !== -1) {
+    memProducts[idx] = prod;
+  } else {
+    memProducts.push(prod);
+  }
+  await refreshProductWeightsMap();
+  return { success: true, name: prod.name };
+}
+
+export async function updateProduct(originalName: string, prod: ProductCatalogItem): Promise<any> {
+  if (usePostgres) {
+    try {
+      if (originalName !== prod.name) {
+        await query(
+          `UPDATE products 
+           SET name = $1, weight_g = $2, purchase_price = $3, selling_price = $4, notes = $5
+           WHERE name = $6`,
+          [prod.name, prod.weight_g, prod.purchase_price, prod.selling_price, prod.notes || "", originalName]
+        );
+      } else {
+        await query(
+          `UPDATE products 
+           SET weight_g = $1, purchase_price = $2, selling_price = $3, notes = $4
+           WHERE name = $5`,
+          [prod.weight_g, prod.purchase_price, prod.selling_price, prod.notes || "", originalName]
+        );
+      }
+      await refreshProductWeightsMap();
+      return { success: true };
+    } catch (e: any) {
+      console.error("updateProduct postgres failed. Error:", e.message);
+    }
+  }
+
+  // Fallback
+  const idx = memProducts.findIndex(p => p.name.toLowerCase().trim() === originalName.toLowerCase().trim());
+  if (idx !== -1) {
+    memProducts[idx] = prod;
+  } else {
+    memProducts.push(prod);
+  }
+  await refreshProductWeightsMap();
+  return { success: true };
+}
+
+export async function deleteProduct(name: string): Promise<any> {
+  if (usePostgres) {
+    try {
+      const res = await query("DELETE FROM products WHERE name = $1", [name]);
+      await refreshProductWeightsMap();
+      return { success: true, deletedRows: res.rowCount };
+    } catch (e: any) {
+      console.error("deleteProduct postgres failed:", e.message);
+    }
+  }
+
+  const idx = memProducts.findIndex(p => p.name.toLowerCase().trim() === name.toLowerCase().trim());
+  if (idx !== -1) {
+    memProducts.splice(idx, 1);
+    await refreshProductWeightsMap();
+    return { success: true, deletedRows: 1 };
+  }
+  return { success: false, deletedRows: 0 };
+}
+
+export async function refreshProductWeightsMap(): Promise<void> {
+  const prodCatalog = await getProducts();
+  for (const p of prodCatalog) {
+    PRODUCT_WEIGHTS[p.name] = p.weight_g;
+  }
+}
+
+export async function getProductWeightHelper(productName: string): Promise<number> {
+  if (PRODUCT_WEIGHTS[productName] !== undefined) {
+    return PRODUCT_WEIGHTS[productName];
+  }
+  const prodCatalog = await getProducts();
+  const p = prodCatalog.find(item => item.name.toLowerCase().trim() === productName.toLowerCase().trim());
+  if (p) {
+    PRODUCT_WEIGHTS[productName] = p.weight_g;
+    return p.weight_g;
+  }
+  if (productName.includes("1kg")) return 1000;
+  if (productName.includes("500g")) return 500;
+  if (productName.includes("250g")) return 250;
+  return 500;
+}
+
+export function getMemProductWeight(productName: string): number {
+  const p = memProducts.find(item => item.name.toLowerCase().trim() === productName.toLowerCase().trim());
+  return p ? p.weight_g : 500;
+}
+
+export async function getBatchAvailableWeight(batchId: string, totalWeightKg: number): Promise<number> {
+  let orderedWeightKg = 0;
+  if (usePostgres) {
+    try {
+      const res = await query(`
+        SELECT product_name, quantity 
+        FROM order_items 
+        WHERE batch_id = $1
+      `, [batchId]);
+      for (const row of res.rows) {
+        const qty = parseFloat(row.quantity) || 0;
+        const weightG = await getProductWeightHelper(row.product_name);
+        orderedWeightKg += (weightG * qty) / 1000;
+      }
+    } catch (e: any) {
+      console.error("Error calculating batch available weight:", e.message);
+    }
+  } else {
+    const items = memOrders.filter(o => o.batchId === batchId);
+    for (const item of items) {
+      const weightG = getMemProductWeight(item.productName);
+      orderedWeightKg += (weightG * item.quantity) / 1000;
+    }
+  }
+  return Math.max(0, totalWeightKg - orderedWeightKg);
 }

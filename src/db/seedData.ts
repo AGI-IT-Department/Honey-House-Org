@@ -29,6 +29,7 @@ export interface BatchSeed {
   status: string;
   notes: string;
   items: BatchItemSeed[];
+  total_weight_kg?: number;
 }
 
 export interface OrderSeed {
