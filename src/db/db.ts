@@ -1452,17 +1452,16 @@ export async function createOrder(orderData: any): Promise<any> {
 }
 
 export async function updateOrder(orderId: string, orderData: any): Promise<any> {
-  // To handle fully robust updates, we can restore previous order item weights, delete, and re-create!
-  const prev = await getOrderById(orderId);
-  if (prev) {
-    // Restore prev weights delta
-    const prevWeight = (PRODUCT_WEIGHTS[prev.Product] || 0) * prev.Quantity / 1000;
-    await updateBatchWeight(prev["Import Batch ID"], prev.Product, prevWeight);
+  // To handle fully robust updates, we restore previous order items' weights, delete, and re-create!
+  const prevList = await getOrders();
+  const matched = prevList.filter(o => o["Order ID"] === orderId);
+  for (const item of matched) {
+    const weightToRestore = (PRODUCT_WEIGHTS[item.Product] || 0) * item.Quantity / 1000;
+    await updateBatchWeight(item["Import Batch ID"], item.Product, weightToRestore);
   }
 
-  // Standard Apps Script structure wraps flat updates for editing.
-  // Translating incoming flat order payload to relational structures
-  const productsList = [{
+  // If orderData has a 'products' array, we use it directly. Otherwise construct from flat fields.
+  const productsList = orderData.products ? orderData.products : [{
     productName: orderData.Product,
     quantity: orderData.Quantity,
     unitPrice: orderData["Unit Price"],
@@ -1472,13 +1471,13 @@ export async function updateOrder(orderId: string, orderData: any): Promise<any>
 
   const fullOrderObj = {
     orderId,
-    orderDate: orderData["Order Date"],
-    customerId: orderData["Customer ID"],
-    customerName: orderData["Customer Name (Auto)"],
-    customerPhone: orderData["Customer Phone (Auto)"],
-    customerLocation: orderData["Customer Location (Auto)"],
-    deliveryStatus: orderData["Delivery Status"],
-    paymentStatus: orderData["Payment Status"],
+    orderDate: orderData.orderDate || orderData["Order Date"],
+    customerId: orderData.customerId || orderData["Customer ID"],
+    customerName: orderData.customerName || orderData["Customer Name (Auto)"],
+    customerPhone: orderData.customerPhone || orderData["Customer Phone (Auto)"],
+    customerLocation: orderData.customerLocation || orderData["Customer Location (Auto)"],
+    deliveryStatus: orderData.deliveryStatus || orderData["Delivery Status"],
+    paymentStatus: orderData.paymentStatus || orderData["Payment Status"],
     products: productsList
   };
 

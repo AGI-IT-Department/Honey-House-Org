@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="honeyGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="60%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@800;900&amp;family=Playfair+Display:ital,wght@1,600&amp;display=swap');
+      .arabic-title {
+        font-family: 'Cairo', 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
+        font-weight: 900;
+        fill: #451a03;
+      }
+      .english-title {
+        font-family: 'Playfair Display', 'Georgia', serif;
+        font-style: italic;
+        font-weight: 600;
+        fill: #b45309;
+      }
+    </style>
+  </defs>
+
+  <!-- Outer Thick Dripping Honey Ring (matching user's uploaded image theme) -->
+  <path 
+    d="M 50 8 
+       C 74 8, 92 26, 92 50 
+       C 92 56, 89 59, 90 65 
+       C 91 72, 95 76, 91 82 
+       C 87 88, 79 86, 74 88 
+       C 69 90, 66 94, 61 93 
+       C 56 92, 53 87, 48 89 
+       C 43 91, 38 94, 33 92 
+       C 27 90, 24 85, 20 80 
+       C 16 75, 12 70, 16 62 
+       C 18 57, 16 53, 16 48 
+       C 16 26, 32 8, 50 8 Z" 
+    fill="none" 
+    stroke="url(#honeyGold)" 
+    stroke-width="5" 
+    stroke-linecap="round" 
+  />
+
+  <!-- Drips and Splashes -->
+  <path d="M 50 82 Q 50 97 48 98 Q 46 97 46 82" fill="none" stroke="url(#honeyGold)" stroke-width="3" stroke-linecap="round" />
+  <path d="M 28 80 Q 23 88 21 89 Q 19 88 23 79" fill="none" stroke="url(#honeyGold)" stroke-width="2" stroke-linecap="round" />
+  <path d="M 72 80 Q 77 88 79 87 Q 81 85 75 79" fill="none" stroke="url(#honeyGold)" stroke-width="2" stroke-linecap="round" />
+
+  <!-- Splashes on Left and Right borders of the ring -->
+  <circle cx="11" cy="48" r="1.5" fill="#d97706" />
+  <circle cx="89" cy="58" r="1.2" fill="#d97706" />
+  <circle cx="42" cy="18" r="1" fill="#fbbf24" />
+  <circle cx="78" cy="24" r="1" fill="#fbbf24" />
+
+  <!-- Simple House Outline (Deep Cocoa Color) -->
+  <path 
+    d="M 33 37 L 50 20 L 67 37 
+       M 38 31 L 38 56 L 62 56 L 62 31" 
+    fill="none" 
+    stroke="#451a03" 
+    stroke-width="3" 
+    stroke-linecap="round" 
+    stroke-linejoin="round" 
+  />
+  <!-- Chimney -->
+  <path d="M 57 26 L 57 21 L 60 21 L 60 29" fill="none" stroke="#451a03" stroke-width="3" stroke-linecap="round" />
+
+  <!-- Dome Beehive inside the house (layered golden-yellow segments) -->
+  <g fill="url(#honeyGold)" stroke="#451a03" stroke-width="1.3" stroke-linejoin="round">
+    <path d="M 43 52 C 43 53.5, 57 53.5, 57 52 C 57 50.5, 43 50.5, 43 52 Z" />
+    <path d="M 41 48 C 41 50, 59 50, 59 48 C 59 46, 41 46, 41 48 Z" />
+    <path d="M 39 44 C 39 46, 61 46, 61 44 C 61 42, 39 42, 39 44 Z" />
+    <path d="M 42 39 C 42 42, 58 42, 58 39 C 58 36, 42 36, 42 39 Z" />
+    <path d="M 46 35 C 46 37, 54 37, 54 35 C 54 33, 46 33, 46 35 Z" />
+  </g>
+  <!-- HiveEntrance -->
+  <circle cx="50" cy="44" r="2" fill="#451a03" />
+
+  <!-- Cute Flying Honey Bee to the Right of Hive -->
+  <g transform="translate(64, 34)">
+    <ellipse cx="0" cy="0" rx="4" ry="3" fill="#fbbf24" stroke="#451a03" stroke-width="1" />
+    <!-- Bee stripes -->
+    <path d="M -1.2 -2.8 L -1.2 2.8 M 1.2 -2.8 L 1.2 2.8" stroke="#451a03" stroke-width="1" />
+    <!-- Wings -->
+    <ellipse cx="-1" cy="-3.5" rx="1.5" ry="2.2" fill="#ffffff" stroke="#451a03" stroke-width="0.8" transform="rotate(-15)" opacity="0.9" />
+    <ellipse cx="1" cy="-3.5" rx="1" ry="1.8" fill="#ffffff" stroke="#451a03" stroke-width="0.8" transform="rotate(15)" opacity="0.9" />
+    <!-- Stinger -->
+    <path d="M 3.2 -0.8 Q 4.2 -1.5 4 -2.2" stroke="#451a03" stroke-width="0.8" fill="none" />
+  </g>
+
+  <!-- Arabic Calligraphy "بيت العسل" -->
+  <text x="50" y="69" class="arabic-title" text-anchor="middle" font-size="8.8">بيت العسل</text>
+
+  <!-- English Cursive Script "Honey House" -->
+  <text x="50" y="78" class="english-title" text-anchor="middle" font-size="6.8">Honey House</text>
+  
+  <!-- Mini bottom embellishment dot -->
+  <circle cx="50" cy="83" r="0.8" fill="#d97706" />
+</svg>

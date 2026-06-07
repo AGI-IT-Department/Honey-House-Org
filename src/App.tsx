@@ -632,34 +632,54 @@ export default function App() {
     setIsOrderModalOpen(true);
   };
 
-  const handleEditClick = async (item: OrderItem) => {
+  const handleEditClick = async (clickedItem: OrderItem) => {
     try {
       showToast("Loading order specifications...", "info");
-      const res = await fetch(`/api/batches/${item["Import Batch ID"]}/products`);
-      const list = await res.json();
       
-      const loadedProduct = {
-        productName: item["Product"],
-        quantity: item["Quantity"],
-        unitPrice: item["Unit Price"],
-        costPrice: item["Cost Price"],
-        batchId: item["Import Batch ID"],
-        availableQuantity: (list.find((o: any) => o.product === item["Product"])?.availableQuantity || 0) + item["Quantity"],
-        maxWeight: (list.find((o: any) => o.product === item["Product"])?.availableWeight || 0) + ((PRODUCT_WEIGHTS[item["Product"]] || 0) * item["Quantity"] / 1000), 
-        availableProductsOptions: list
-      };
+      // Find all items in the current local orders array with the same Order ID
+      const matchingItems = orders.filter(o => o["Order ID"] === clickedItem["Order ID"]);
+      
+      // For each item, we need its batch product options
+      // To run queries efficiently, we can fetch all required batch options in parallel
+      const uniqueBatchIds = Array.from(new Set(matchingItems.map(item => String(item["Import Batch ID"]))));
+      
+      const batchOptionsMap: Record<string, any[]> = {};
+      await Promise.all(uniqueBatchIds.map(async (bId: string) => {
+        try {
+          const res = await fetch(`/api/batches/${bId}/products`);
+          const list = await res.json();
+          batchOptionsMap[bId] = list;
+        } catch {
+          batchOptionsMap[bId] = [];
+        }
+      }));
+
+      const loadedProducts = matchingItems.map(item => {
+        const list = batchOptionsMap[item["Import Batch ID"]] || [];
+        const prodOpt = list.find((o: any) => o.product === item["Product"]);
+        return {
+          productName: item["Product"],
+          quantity: item["Quantity"],
+          unitPrice: item["Unit Price"],
+          costPrice: item["Cost Price"],
+          batchId: item["Import Batch ID"],
+          availableQuantity: (prodOpt?.availableQuantity || 0) + item["Quantity"],
+          maxWeight: (prodOpt?.availableWeight || 0) + ((PRODUCT_WEIGHTS[item["Product"]] || 0) * item["Quantity"] / 1000),
+          availableProductsOptions: list
+        };
+      });
 
       setNewOrder({
-        customerId: item["Customer ID"],
-        customerName: item["Customer Name (Auto)"],
-        customerPhone: item["Customer Phone (Auto)"],
-        customerLocation: item["Customer Location (Auto)"] || "Dubai",
-        deliveryStatus: item["Delivery Status"],
-        paymentStatus: item["Payment Status"],
-        orderDate: item["Order Date"],
-        products: [loadedProduct]
+        customerId: clickedItem["Customer ID"],
+        customerName: clickedItem["Customer Name (Auto)"],
+        customerPhone: clickedItem["Customer Phone (Auto)"],
+        customerLocation: clickedItem["Customer Location (Auto)"] || "Dubai",
+        deliveryStatus: clickedItem["Delivery Status"],
+        paymentStatus: clickedItem["Payment Status"],
+        orderDate: clickedItem["Order Date"],
+        products: loadedProducts
       });
-      setEditingOrderId(item["Order ID"]);
+      setEditingOrderId(clickedItem["Order ID"]);
       setIsOrderModalOpen(true);
     } catch (err) {
       showToast("Error loading order item specs.", "danger");
@@ -681,20 +701,7 @@ export default function App() {
 
     const cid = newOrder.customerId || "CUST" + String(Date.now()).substring(7);
 
-    const payload = editingOrderId ? {
-      "Product": newOrder.products[0].productName,
-      "Quantity": newOrder.products[0].quantity,
-      "Unit Price": newOrder.products[0].unitPrice,
-      "Cost Price": newOrder.products[0].costPrice,
-      "Import Batch ID": newOrder.products[0].batchId,
-      "Order Date": newOrder.orderDate,
-      "Customer ID": cid,
-      "Customer Name (Auto)": newOrder.customerName,
-      "Customer Phone (Auto)": newOrder.customerPhone,
-      "Customer Location (Auto)": newOrder.customerLocation,
-      "Delivery Status": newOrder.deliveryStatus,
-      "Payment Status": newOrder.paymentStatus
-    } : {
+    const payload = {
       ...newOrder,
       customerId: cid
     };
@@ -990,72 +997,12 @@ export default function App() {
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-amber-50/15">
           <div className="flex items-center gap-3">
             {/* Custom SVG logo representing physical bait al asal / Honey House logo */}
-            <svg viewBox="0 0 100 100" className="w-11 h-11 flex-shrink-0">
-              <defs>
-                <linearGradient id="honeyGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#fbbf24" />
-                  <stop offset="60%" stopColor="#d97706" />
-                  <stop offset="100%" stopColor="#b45309" />
-                </linearGradient>
-              </defs>
-              
-              {/* Dripping Honey Circular Frame (inspired by image) */}
-              <path 
-                d="M 50 10 
-                   C 72 10, 90 28, 90 50 
-                   C 90 55, 87 58, 88 64 
-                   C 89 71, 93 75, 89 81 
-                   C 85 87, 77 85, 72 87 
-                   C 67 89, 64 93, 59 92 
-                   C 54 91, 51 86, 46 88 
-                   C 41 90, 36 93, 31 91 
-                   C 25 89, 22 84, 18 79 
-                   C 14 74, 10 69, 14 61 
-                   C 16 56, 14 52, 14 47 
-                   C 14 27, 30 10, 50 10 Z" 
-                fill="none" 
-                stroke="url(#honeyGoldGrad)" 
-                strokeWidth="5" 
-                strokeLinecap="round" 
-              />
-              
-              {/* Splashes & Drips at Bottom */}
-              <path d="M 50 82 Q 50 96 48 97 Q 46 96 46 82" fill="none" stroke="url(#honeyGoldGrad)" strokeWidth="3.5" strokeLinecap="round" />
-              <path d="M 28 80 Q 23 88 21 89 Q 19 88 23 79" fill="none" stroke="url(#honeyGoldGrad)" strokeWidth="2.5" strokeLinecap="round" />
-              <path d="M 72 80 Q 77 88 79 87 Q 81 85 75 79" fill="none" stroke="url(#honeyGoldGrad)" strokeWidth="2.5" strokeLinecap="round" />
-
-              {/* House Outline (Amber-950) */}
-              <path 
-                d="M 33 49 L 50 32 L 67 49 
-                   M 38 43 L 38 68 L 62 68 L 62 43" 
-                fill="none" 
-                stroke="#451a03" 
-                strokeWidth="3.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-              />
-              <path d="M 57 38 L 57 33 L 60 33 L 60 41" fill="none" stroke="#451a03" strokeWidth="3.5" strokeLinecap="round" />
-
-              {/* Dome Beehive with layered honey segments */}
-              <g fill="url(#honeyGoldGrad)" stroke="#451a03" strokeWidth="1.5" strokeLinejoin="round">
-                <path d="M 43 64 C 43 65.5, 57 65.5, 57 64 C 57 62.5, 43 62.5, 43 64 Z" />
-                <path d="M 41 60 C 41 62, 59 62, 59 60 C 59 58, 41 58, 41 60 Z" />
-                <path d="M 39 56 C 39 58, 61 58, 61 56 C 61 54, 39 54, 39 56 Z" />
-                <path d="M 42 51 C 42 54, 58 54, 58 51 C 58 48, 42 48, 42 51 Z" />
-                <path d="M 46 47 C 46 49, 54 49, 54 47 C 54 45, 46 45, 46 47 Z" />
-              </g>
-              {/* Hive entrance */}
-              <circle cx="50" cy="56" r="2.5" fill="#451a03" />
-              
-              {/* Mini Flying Bee */}
-              <g transform="translate(64, 46) scale(1)">
-                <ellipse cx="0" cy="0" rx="4.5" ry="3.5" fill="#fbbf24" stroke="#451a03" strokeWidth="1" />
-                <path d="M -1.5 -3.2 L -1.5 3.2 M 1.5 -3.2 L 1.5 3.2" stroke="#451a03" strokeWidth="1" />
-                <ellipse cx="-1.2" cy="-4" rx="1.8" ry="2.5" fill="#ffffff" stroke="#451a03" strokeWidth="0.8" transform="rotate(-15)" opacity="0.95" />
-                <ellipse cx="1.2" cy="-4" rx="1.2" ry="2" fill="#ffffff" stroke="#451a03" strokeWidth="0.8" transform="rotate(15)" opacity="0.95" />
-                <path d="M 3.5 -1 Q 4.5 -2 4.2 -3" stroke="#451a03" strokeWidth="0.8" fill="none" />
-              </g>
-            </svg>
+            <img 
+              src="/src/logo.svg" 
+              className="w-12 h-12 flex-shrink-0 drop-shadow-sm select-none" 
+              alt="Honey House Logo" 
+              referrerPolicy="no-referrer" 
+            />
             <div>
               <h1 className="font-bold text-lg leading-none text-slate-900 tracking-tight">Honey House</h1>
               <div className="flex items-center gap-1 mt-1">
@@ -3047,6 +2994,14 @@ export default function App() {
             <div className="pt-4 border-t border-slate-100 font-sans">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
                 <span>Items to purchase</span>
+                <button
+                  type="button"
+                  onClick={handleAddProductRow}
+                  className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Product Item</span>
+                </button>
               </h3>
 
               <div className="space-y-4">
@@ -3135,6 +3090,16 @@ export default function App() {
                             {formatAED(item.quantity * item.unitPrice)}
                           </span>
                         </div>
+                        {newOrder.products.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveProductRow(index)}
+                            className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-2.5 rounded-lg transition"
+                            title="Remove Item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
