@@ -40,7 +40,8 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  isUsingPostgres
+  isUsingPostgres,
+  getDbError
 } from "./src/db/db.js";
 
 // Load environment variables
@@ -74,7 +75,8 @@ async function startServer() {
   app.get("/api/db-status", (req, res) => {
     res.json({
       usePostgres: isUsingPostgres(),
-      hasDatabaseUrl: !!process.env.DATABASE_URL
+      hasDatabaseUrl: !!process.env.DATABASE_URL,
+      dbError: getDbError()
     });
   });
 

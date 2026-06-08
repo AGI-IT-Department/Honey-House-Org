@@ -278,7 +278,7 @@ export default function App() {
   const [monthsList, setMonthsList] = useState<string[]>([]);
 
   // Database connection status state
-  const [dbStatus, setDbStatus] = useState({ usePostgres: false, hasDatabaseUrl: false });
+  const [dbStatus, setDbStatus] = useState({ usePostgres: false, hasDatabaseUrl: false, dbError: null as string | null });
 
   // Trigger toast alert
   const showToast = (message: string, type: "success" | "danger" | "warning" | "info" = "info") => {
@@ -1221,6 +1221,16 @@ export default function App() {
           <div className="text-[10px] text-slate-500 mt-1 font-mono leading-relaxed">
             {dbStatus.usePostgres ? (
               <span className="text-emerald-700 font-semibold block">✓ Database Secure & Persistent</span>
+            ) : dbStatus.hasDatabaseUrl ? (
+              <div className="text-rose-600 block space-y-1">
+                <span className="font-semibold block">⚠️ Connection Failed!</span>
+                <span className="text-[9px] text-rose-800 font-mono block break-words bg-rose-50 p-1.5 rounded border border-rose-100 max-h-24 overflow-y-auto">
+                  {dbStatus.dbError || "Invalid credentials/connection config."}
+                </span>
+                <span className="text-[9px] text-slate-500 block">
+                  Please verify your password in Render environment variables.
+                </span>
+              </div>
             ) : (
               <span className="text-rose-600 font-semibold block">
                 ⚠️ DATABASE_URL missing in Render! Data will reset on server restart. Declare DATABASE_URL to persist.

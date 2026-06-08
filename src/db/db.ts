@@ -30,9 +30,14 @@ export const PRODUCT_WEIGHTS: Record<string, number> = {
 // Database connection pool setup - lazily initialized
 let pool: pg.Pool | null = null;
 let usePostgres = false;
+let dbError: string | null = null;
 
 export function isUsingPostgres(): boolean {
   return usePostgres;
+}
+
+export function getDbError(): string | null {
+  return dbError;
 }
 
 // Global in-memory states (fallback DB)
@@ -109,6 +114,7 @@ export function getPool(): pg.Pool | null {
       console.log("PostgreSQL Pool created successfully using parsed configurations.");
     } catch (e: any) {
       console.error("Failed to configure Postgres Pool. Falling back to in-memory mode.", e.message);
+      dbError = "Config phase: " + e.message;
       pool = null;
       usePostgres = false;
     }
@@ -402,6 +408,7 @@ export async function initDb(): Promise<boolean> {
     return true;
   } catch (err: any) {
     console.error("Database connection check/migration failed. Reverting to graceful in-memory simulation.", err.message);
+    dbError = "Connection phase: " + err.message;
     usePostgres = false;
     return false;
   }
