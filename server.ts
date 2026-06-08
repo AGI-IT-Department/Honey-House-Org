@@ -39,7 +39,8 @@ import {
   getProducts,
   createProduct,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  isUsingPostgres
 } from "./src/db/db.js";
 
 // Load environment variables
@@ -68,6 +69,14 @@ async function startServer() {
   /* ==========================================================================
      API ROUTES - PREFIX '/api'
      ========================================================================== */
+
+  // 0. Database Status Endpoint
+  app.get("/api/db-status", (req, res) => {
+    res.json({
+      usePostgres: isUsingPostgres(),
+      hasDatabaseUrl: !!process.env.DATABASE_URL
+    });
+  });
 
   // 1. Dashboard BI Metrics
   app.get("/api/dashboard", async (req, res) => {

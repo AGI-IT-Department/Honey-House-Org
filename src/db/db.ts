@@ -31,6 +31,10 @@ export const PRODUCT_WEIGHTS: Record<string, number> = {
 let pool: pg.Pool | null = null;
 let usePostgres = false;
 
+export function isUsingPostgres(): boolean {
+  return usePostgres;
+}
+
 // Global in-memory states (fallback DB)
 let memCustomers: CustomerSeed[] = [...SEED_CUSTOMERS];
 let memBatches: BatchSeed[] = JSON.parse(JSON.stringify(SEED_BATCHES));

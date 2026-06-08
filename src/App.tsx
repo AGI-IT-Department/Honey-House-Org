@@ -277,6 +277,9 @@ export default function App() {
   // Available months cache
   const [monthsList, setMonthsList] = useState<string[]>([]);
 
+  // Database connection status state
+  const [dbStatus, setDbStatus] = useState({ usePostgres: false, hasDatabaseUrl: false });
+
   // Trigger toast alert
   const showToast = (message: string, type: "success" | "danger" | "warning" | "info" = "info") => {
     const id = Date.now() + Math.random();
@@ -474,14 +477,16 @@ export default function App() {
 
   const fetchStaticConfig = async () => {
     try {
-      const [expCat, distCat, bIds] = await Promise.all([
+      const [expCat, distCat, bIds, dbStat] = await Promise.all([
         fetch("/api/expenses/categories").then(r => r.json()),
         fetch("/api/expenses/distribution-categories").then(r => r.json()),
-        fetch("/api/batches/status-list").then(r => r.json())
+        fetch("/api/batches/status-list").then(r => r.json()),
+        fetch("/api/db-status").then(r => r.json()).catch(() => ({ usePostgres: false, hasDatabaseUrl: false }))
       ]);
       setExpenseCategories(expCat);
       setDistributionCategories(distCat);
       setBatchIdsWithStatus(bIds);
+      setDbStatus(dbStat);
 
       // Generate a mock list of months for selectors
       const months = [];
@@ -1208,13 +1213,19 @@ export default function App() {
         {/* Dynamic status footer in drawer */}
         <div className="p-4 border-t border-slate-200 bg-slate-50">
           <div className="flex items-center gap-2">
-            <div className="status-pulse animate-pulse bg-emerald-500 w-2 h-2 rounded-full"></div>
-            <span className="text-xs text-slate-700 font-semibold uppercase tracking-wider">
-              Supabase PostgreSQL Live
+            <div className={`status-pulse animate-pulse ${dbStatus.usePostgres ? "bg-emerald-500" : "bg-rose-500"} w-2.5 h-2.5 rounded-full`}></div>
+            <span className="text-xs text-slate-700 font-bold uppercase tracking-wider">
+              {dbStatus.usePostgres ? "Supabase Dedicated" : "LOCAL MEMORY ONLY"}
             </span>
           </div>
-          <div className="text-[10px] text-slate-500 mt-1 font-mono">
-            {process.env.DATABASE_URL ? "Supabase Dedicated" : "In-Memory Fallback Client"}
+          <div className="text-[10px] text-slate-500 mt-1 font-mono leading-relaxed">
+            {dbStatus.usePostgres ? (
+              <span className="text-emerald-700 font-semibold block">✓ Database Secure & Persistent</span>
+            ) : (
+              <span className="text-rose-600 font-semibold block">
+                ⚠️ DATABASE_URL missing in Render! Data will reset on server restart. Declare DATABASE_URL to persist.
+              </span>
+            )}
           </div>
         </div>
       </aside>
