@@ -673,15 +673,23 @@ export async function getBatches(startDate?: string, endDate?: string): Promise<
         let totalWeight = parseFloat(row.total_weight_kg) || DEFAULT_BATCH_WEIGHTS[batchId] || 0.0;
         const availableWeight = await getBatchAvailableWeight(batchId, totalWeight);
 
+        const itemsRes = await query("SELECT * FROM batch_items WHERE batch_id = $1", [batchId]);
+        const itemsMap = new Map(itemsRes.rows.map(item => [item.product_name, item]));
+
         const products = prodCatalog.map(p => {
           const weightUnit = p.weight_g;
+          const matchedItem = itemsMap.get(p.name);
+          const pPrice = matchedItem ? parseFloat(matchedItem.purchase_price) : p.purchase_price;
+          const sCost = matchedItem ? parseFloat(matchedItem.shipping_cost) : 0;
+          const lCost = matchedItem ? parseFloat(matchedItem.local_cost) : 0;
+          const totalCostPr = matchedItem ? parseFloat(matchedItem.total_cost_per_product) : (pPrice + sCost + lCost);
           return {
             Product: p.name,
             Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
-            "Purchase Price": p.purchase_price,
-            "Shipping Cost": 0,
-            "Local Cost": 0,
-            "Total Cost per product": p.purchase_price,
+            "Purchase Price": pPrice,
+            "Shipping Cost": sCost,
+            "Local Cost": lCost,
+            "Total Cost per product": totalCostPr,
             "Product Weight": totalWeight,
             "Available Weight": availableWeight
           };
@@ -727,13 +735,18 @@ export async function getBatches(startDate?: string, endDate?: string): Promise<
 
     const itemsMapped = prodCatalog.map(p => {
       const weightUnit = p.weight_g;
+      const matched = b.items?.find((item: any) => item.productName === p.name || item.Product === p.name) as any;
+      const pPrice = matched ? (matched.purchasePrice ?? matched["Purchase Price"] ?? p.purchase_price) : p.purchase_price;
+      const sCost = matched ? (matched.shippingCost ?? matched.shippingPrice ?? matched["Shipping Cost"] ?? 0) : 0;
+      const lCost = matched ? (matched.localCost ?? matched["Local Cost"] ?? 0) : 0;
+      const totalCostPr = matched ? (matched.totalCost ?? matched["Total Cost per product"] ?? (pPrice + sCost + lCost)) : (pPrice + sCost + lCost);
       return {
         Product: p.name,
         Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
-        "Purchase Price": p.purchase_price,
-        "Shipping Cost": 0,
-        "Local Cost": 0,
-        "Total Cost per product": p.purchase_price,
+        "Purchase Price": pPrice,
+        "Shipping Cost": sCost,
+        "Local Cost": lCost,
+        "Total Cost per product": totalCostPr,
         "Product Weight": totalWeight,
         "Available Weight": availableWeight
       };
@@ -799,15 +812,23 @@ export async function getBatchById(batchId: string): Promise<any | null> {
       let totalWeight = parseFloat(b.total_weight_kg) || DEFAULT_BATCH_WEIGHTS[batchId] || 0.0;
       const availableWeight = await getBatchAvailableWeight(batchId, totalWeight);
 
+      const itemsRes = await query("SELECT * FROM batch_items WHERE batch_id = $1", [batchId]);
+      const itemsMap = new Map(itemsRes.rows.map(item => [item.product_name, item]));
+
       const products = prodCatalog.map(p => {
         const weightUnit = p.weight_g;
+        const matchedItem = itemsMap.get(p.name);
+        const pPrice = matchedItem ? parseFloat(matchedItem.purchase_price) : p.purchase_price;
+        const sCost = matchedItem ? parseFloat(matchedItem.shipping_cost) : 0;
+        const lCost = matchedItem ? parseFloat(matchedItem.local_cost) : 0;
+        const totalCostPr = matchedItem ? parseFloat(matchedItem.total_cost_per_product) : (pPrice + sCost + lCost);
         return {
           Product: p.name,
           Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
-          "Purchase Price": p.purchase_price,
-          "Shipping Cost": 0,
-          "Local Cost": 0,
-          "Total Cost per product": p.purchase_price,
+          "Purchase Price": pPrice,
+          "Shipping Cost": sCost,
+          "Local Cost": lCost,
+          "Total Cost per product": totalCostPr,
           "Product Weight": totalWeight,
           "Available Weight": availableWeight
         };
@@ -841,13 +862,18 @@ export async function getBatchById(batchId: string): Promise<any | null> {
 
   const itemsMapped = prodCatalog.map(p => {
     const weightUnit = p.weight_g;
+    const matched = b.items?.find((item: any) => item.productName === p.name || item.Product === p.name) as any;
+    const pPrice = matched ? (matched.purchasePrice ?? matched["Purchase Price"] ?? p.purchase_price) : p.purchase_price;
+    const sCost = matched ? (matched.shippingCost ?? matched.shippingPrice ?? matched["Shipping Cost"] ?? 0) : 0;
+    const lCost = matched ? (matched.localCost ?? matched["Local Cost"] ?? 0) : 0;
+    const totalCostPr = matched ? (matched.totalCost ?? matched["Total Cost per product"] ?? (pPrice + sCost + lCost)) : (pPrice + sCost + lCost);
     return {
       Product: p.name,
       Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
-      "Purchase Price": p.purchase_price,
-      "Shipping Cost": 0,
-      "Local Cost": 0,
-      "Total Cost per product": p.purchase_price,
+      "Purchase Price": pPrice,
+      "Shipping Cost": sCost,
+      "Local Cost": lCost,
+      "Total Cost per product": totalCostPr,
       "Product Weight": totalWeight,
       "Available Weight": availableWeight
     };
@@ -908,13 +934,19 @@ export async function createBatch(batchData: any): Promise<any> {
       // Clean existing batch items to allow complete rebuild of edited items
       await query("DELETE FROM batch_items WHERE batch_id = $1", [batchId]);
 
-      // Populating dummy batch items for compatibility
+      // Populating batch items with possible overrides
       const prodCatalog = await getProducts();
       for (const p of prodCatalog) {
+        const customItem = batchData.products?.find((ci: any) => ci.productName === p.name || ci.Product === p.name);
+        const pPrice = customItem ? (parseFloat(customItem.purchasePrice ?? customItem["Purchase Price"]) ?? p.purchase_price) : p.purchase_price;
+        const sCost = customItem ? (parseFloat(customItem.shippingCost ?? customItem["Shipping Cost"]) || 0) : 0;
+        const lCost = customItem ? (parseFloat(customItem.localCost ?? customItem["Local Cost"]) || 0) : 0;
+        const totalCostPr = pPrice + sCost + lCost;
+
         await query(
           `INSERT INTO batch_items (batch_id, product_name, quantity, purchase_price, shipping_cost, local_cost, total_cost_per_product, total_weight_kg, available_weight_kg, status)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Active')`,
-          [batchId, p.name, 1, p.purchase_price, 0, 0, p.purchase_price, tWt, tWt]
+          [batchId, p.name, 1, pPrice, sCost, lCost, totalCostPr, tWt, tWt]
         );
       }
 
@@ -926,6 +958,23 @@ export async function createBatch(batchData: any): Promise<any> {
 
   // Fallback
   const idx = memBatches.findIndex(b => b.id === batchId);
+  const prodCatalog = await getProducts();
+  const itemsList = prodCatalog.map(p => {
+    const customItem = batchData.products?.find((ci: any) => ci.productName === p.name || ci.Product === p.name);
+    const pPrice = customItem ? (parseFloat(customItem.purchasePrice ?? customItem["Purchase Price"]) ?? p.purchase_price) : p.purchase_price;
+    const sCost = customItem ? (parseFloat(customItem.shippingCost ?? customItem["Shipping Cost"]) || 0) : 0;
+    const lCost = customItem ? (parseFloat(customItem.localCost ?? customItem["Local Cost"]) || 0) : 0;
+    const totalCostPr = pPrice + sCost + lCost;
+    return {
+      productName: p.name,
+      purchasePrice: pPrice,
+      shippingCost: sCost,
+      localCost: lCost,
+      totalCost: totalCostPr,
+      status: "Active"
+    };
+  });
+
   const payload: any = {
     id: batchId,
     name: batchData.name,
@@ -938,7 +987,7 @@ export async function createBatch(batchData: any): Promise<any> {
     status: batchData.status || "Active",
     notes: batchData.notes,
     total_weight_kg: tWt,
-    items: []
+    items: itemsList
   };
 
   if (idx !== -1) {

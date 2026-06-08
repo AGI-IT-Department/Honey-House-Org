@@ -633,7 +633,29 @@ export default function App() {
     setIsOrderModalOpen(true);
   };
 
+  const updateBatchProductCost = (productName: string, field: 'purchasePrice' | 'shippingCost' | 'localCost', val: number) => {
+    setNewBatch(prev => {
+      const updatedProducts = (prev.products || []).map((p: any) => {
+        if (p.productName === productName) {
+          const updatedP = { ...p, [field]: val };
+          updatedP.totalCost = (updatedP.purchasePrice || 0) + (updatedP.shippingCost || 0) + (updatedP.localCost || 0);
+          return updatedP;
+        }
+        return p;
+      });
+      return { ...prev, products: updatedProducts };
+    });
+  };
+
   const openAddBatchModal = () => {
+    const productsList = (productsCatalog || []).map((p: any) => ({
+      productName: p.name,
+      purchasePrice: p.purchase_price,
+      shippingCost: 0,
+      localCost: 0,
+      totalCost: p.purchase_price
+    }));
+
     setNewBatch({
       name: "",
       egyPhone: "",
@@ -644,13 +666,25 @@ export default function App() {
       arrivalDate: new Date().toISOString().split("T")[0],
       notes: "",
       totalWeight: 15.0,
-      products: []
+      products: productsList
     });
     setEditBatchId(null);
     setIsBatchModalOpen(true);
   };
 
   const handleEditBatchClick = (batch: any) => {
+    const existingProducts = batch.Products || [];
+    const productsList = (productsCatalog || []).map((p: any) => {
+      const existing = existingProducts.find((ep: any) => ep.Product === p.name);
+      return {
+        productName: p.name,
+        purchasePrice: existing ? existing["Purchase Price"] : p.purchase_price,
+        shippingCost: existing ? existing["Shipping Cost"] : 0,
+        localCost: existing ? existing["Local Cost"] : 0,
+        totalCost: existing ? existing["Total Cost per product"] : p.purchase_price
+      };
+    });
+
     setNewBatch({
       name: batch.Name || "",
       egyPhone: batch["EGY Phone"] || "",
@@ -661,7 +695,7 @@ export default function App() {
       arrivalDate: batch["Arrival Date (UAE)"] || new Date().toISOString().split("T")[0],
       notes: batch.Notes || "",
       totalWeight: batch["Total Weight"] || 15.0,
-      products: []
+      products: productsList
     });
     setEditBatchId(batch["Import Batch ID"]);
     setIsBatchModalOpen(true);
@@ -3149,6 +3183,68 @@ export default function App() {
                 <p className="text-[10px] text-slate-500 mt-1 font-medium">
                   All products catalog items will automatically be credited for this batch. Orders will deduct available stock weights dynamically.
                 </p>
+              </div>
+            </div>
+
+            {/* Products Pricing Configuration Table */}
+            <div className="pt-6 border-t border-slate-100">
+              <h4 className="text-xs font-bold text-slate-900 mb-2.5 flex items-center gap-1.5 uppercase tracking-wide">
+                <Tag className="w-4 h-4 text-amber-500" />
+                <span>تكاليف منتجات الشحنة (Product Costs Configurations)</span>
+              </h4>
+              <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
+                حدد التكاليف الفردية لكل منتج لهذه الشحنة. سيتم عرض التكلفة الكلية (Total Loaded Cost) لمتابعة الكلفة الإجمالية في الشحنة.
+              </p>
+
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/20">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold">
+                      <th className="py-2.5 px-3">المنتج (Product)</th>
+                      <th className="py-2.5 px-3">سعر الشراء (Unit Purchase - AED)</th>
+                      <th className="py-2.5 px-3">سعر الشحن (Freight Unit Cost)</th>
+                      <th className="py-2.5 px-3">جمارك ونثريات (Custom Jars Toll)</th>
+                      <th className="py-2.5 px-3 text-right">إجمالي الكلفة (Total Cost)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(newBatch.products || []).map((prod: any, idx: number) => (
+                      <tr key={idx} className="border-b border-slate-150 last:border-b-0 hover:bg-slate-50/50 transition">
+                        <td className="py-3 px-3 font-semibold text-slate-800">{prod.productName}</td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={prod.purchasePrice ?? ""}
+                            onChange={e => updateBatchProductCost(prod.productName, "purchasePrice", parseFloat(e.target.value) || 0)}
+                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 w-28 text-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-200 text-xs font-semibold"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={prod.shippingCost ?? ""}
+                            onChange={e => updateBatchProductCost(prod.productName, "shippingCost", parseFloat(e.target.value) || 0)}
+                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 w-28 text-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-200 text-xs font-semibold"
+                          />
+                        </td>
+                        <td className="py-2 px-3">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={prod.localCost ?? ""}
+                            onChange={e => updateBatchProductCost(prod.productName, "localCost", parseFloat(e.target.value) || 0)}
+                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 w-28 text-slate-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-200 text-xs font-semibold"
+                          />
+                        </td>
+                        <td className="py-3 px-3 text-right font-bold text-slate-900">
+                          {((prod.purchasePrice || 0) + (prod.shippingCost || 0) + (prod.localCost || 0)).toFixed(2)} AED
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
