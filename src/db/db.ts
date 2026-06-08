@@ -46,13 +46,56 @@ let memOrders: OrderSeed[] = [...SEED_ORDERS];
 export function getPool(): pg.Pool | null {
   if (!pool && process.env.DATABASE_URL) {
     try {
-      const connectionString = process.env.DATABASE_URL;
+      const connectionString = process.env.DATABASE_URL.trim();
       const poolConfig: any = {
-        connectionString,
         max: 5,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
+        connectionTimeoutMillis: 10000,
       };
+
+      // Robust parsing for connection URLs with special characters in credentials (like '@')
+      if (connectionString.startsWith("postgresql://") || connectionString.startsWith("postgres://")) {
+        const protocolLength = connectionString.startsWith("postgresql://") ? 13 : 11;
+        const rest = connectionString.substring(protocolLength);
+        
+        // Find the last '@' which separates credentials from the host
+        const lastAt = rest.lastIndexOf("@");
+        if (lastAt !== -1) {
+          const credentialsPart = rest.substring(0, lastAt);
+          const hostPart = rest.substring(lastAt + 1);
+          
+          // Parse user & password
+          const colonIdx = credentialsPart.indexOf(":");
+          if (colonIdx !== -1) {
+            poolConfig.user = decodeURIComponent(credentialsPart.substring(0, colonIdx));
+            poolConfig.password = decodeURIComponent(credentialsPart.substring(colonIdx + 1));
+          } else {
+            poolConfig.user = decodeURIComponent(credentialsPart);
+          }
+          
+          // Parse host, port, database from "host:port/database" or "host/database"
+          const [addressPart] = hostPart.split("?");
+          const slashIdx = addressPart.indexOf("/");
+          let hostAndPort = addressPart;
+          if (slashIdx !== -1) {
+            hostAndPort = addressPart.substring(0, slashIdx);
+            poolConfig.database = decodeURIComponent(addressPart.substring(slashIdx + 1));
+          }
+          
+          const lastColon = hostAndPort.lastIndexOf(":");
+          if (lastColon !== -1 && !hostAndPort.endsWith("]")) {
+            poolConfig.host = hostAndPort.substring(0, lastColon);
+            poolConfig.port = parseInt(hostAndPort.substring(lastColon + 1), 10);
+          } else {
+            poolConfig.host = hostAndPort;
+            poolConfig.port = 5432;
+          }
+        } else {
+          poolConfig.connectionString = connectionString;
+        }
+      } else {
+        poolConfig.connectionString = connectionString;
+      }
 
       // Force SSL rejectUnauthorized fallback for Supabase
       if (connectionString.includes("sslmode=") || process.env.NODE_ENV === "production" || connectionString.includes("@db.")) {
@@ -63,7 +106,7 @@ export function getPool(): pg.Pool | null {
 
       pool = new Pool(poolConfig);
       usePostgres = true;
-      console.log("PostgreSQL Pool created successfully using DATABASE_URL.");
+      console.log("PostgreSQL Pool created successfully using parsed configurations.");
     } catch (e: any) {
       console.error("Failed to configure Postgres Pool. Falling back to in-memory mode.", e.message);
       pool = null;
