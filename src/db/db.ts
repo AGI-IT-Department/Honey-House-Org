@@ -381,6 +381,15 @@ export async function initDb(): Promise<boolean> {
       console.log(`Database tables already populated with ${count} customers.`);
     }
 
+    // Ensure all target/seeded balance transactions are populated in Postgres
+    console.log("Ensuring all SEED_BALANCE transactions are populated in Postgres...");
+    for (const bal of SEED_BALANCE) {
+      await client.query(
+        "INSERT INTO balance_transactions (id, date, type, details, amount, balance, note) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
+        [bal.id, bal.date, bal.type, bal.details, bal.amount, bal.balance, bal.note]
+      );
+    }
+
     // ALWAYS calibrate BAL_RECONCILE to make sure the historical ledger ends up with exactly -103 initial balance
     const checkAdjExists = await client.query("SELECT * FROM balance_transactions WHERE id = 'BAL_RECONCILE'");
     if (checkAdjExists.rows.length === 0) {
