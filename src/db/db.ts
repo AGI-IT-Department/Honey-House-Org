@@ -410,22 +410,39 @@ export async function initDb(): Promise<boolean> {
           note = 'Adjustment to align with physical balance of -103'
       `);
 
-      // Always sort chronologically and recalculate balances in Postgres so everything is accurate and beautifully aligned
-      const rowsRes = await client.query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
-      let runningBalance = 0;
-      for (const row of rowsRes.rows) {
-        const amt = parseFloat(row.amount);
-        if (row.type === "Income") {
-          runningBalance += amt;
-        } else {
-          runningBalance -= amt;
-        }
-        await client.query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
-      }
-      console.log("Postgres balances successfully recalculated code-wise! New running balance:", runningBalance);
+      // Always sort chronologically and recalculate balances in Postgres so everything is accurate and beautifully aligned using a single CTE query
+      await client.query(`
+        WITH running_calc AS (
+          SELECT id, SUM(CASE WHEN type = 'Income' THEN amount ELSE -amount END) OVER (ORDER BY date ASC, id ASC) AS new_balance
+          FROM balance_transactions
+        )
+        UPDATE balance_transactions bt
+        SET balance = rc.new_balance
+        FROM running_calc rc
+        WHERE bt.id = rc.id
+      `);
+      console.log("Postgres balances successfully recalculated code-wise using single CTE query statement.");
     } else {
-      console.log(`Database balance_transactions table already has ${balCount} entries. Skipping seeding and balance recalculation for optimal rapid boot!`);
+      console.log(`Database balance_transactions table already has ${balCount} entries. Skipping seeding.`);
     }
+
+    // Forcefully align batch statuses: ONLY BATCH08, BATCH09, and BATCH10 should be Active; all others are Inactive/Closed
+    console.log("Aligning batch statuses: Only BATCH08, BATCH09, BATCH10 should be Active...");
+    await client.query("UPDATE batches SET status = 'Inactive' WHERE id NOT IN ('BATCH08', 'BATCH09', 'BATCH10')");
+    await client.query("UPDATE batches SET status = 'Active' WHERE id IN ('BATCH08', 'BATCH09', 'BATCH10')");
+    await client.query("UPDATE batch_items SET status = 'Inactive' WHERE batch_id NOT IN ('BATCH08', 'BATCH09', 'BATCH10')");
+    await client.query("UPDATE batch_items SET status = 'Active' WHERE batch_id IN ('BATCH08', 'BATCH09', 'BATCH10')");
+
+    // Also update in-memory fallback
+    memBatches.forEach(b => {
+      if (b.id === 'BATCH08' || b.id === 'BATCH09' || b.id === 'BATCH10') {
+        b.status = 'Active';
+        b.items.forEach(itm => itm.status = 'Active');
+      } else {
+        b.status = 'Inactive';
+        b.items.forEach(itm => itm.status = 'Inactive');
+      }
+    });
 
     // Also update in-memory fallback
     const mockRecIndex = memBalance.findIndex(b => b.id === "BAL_RECONCILE");
@@ -474,18 +491,28 @@ export async function recalculatePostgresBalances(): Promise<number> {
   const dbPool = getPool();
   if (usePostgres && dbPool) {
     try {
-      const rowsRes = await dbPool.query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
-      let runningBalance = 0;
-      for (const row of rowsRes.rows) {
-        const amt = parseFloat(row.amount) || 0;
-        if (row.type === "Income") {
-          runningBalance += amt;
-        } else {
-          runningBalance -= amt;
-        }
-        await dbPool.query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
+      // Step 1: Run the single CTE update statement to update all balances chronologically
+      await dbPool.query(`
+        WITH running_calc AS (
+          SELECT id, SUM(CASE WHEN type = 'Income' THEN amount ELSE -amount END) OVER (ORDER BY date ASC, id ASC) AS new_balance
+          FROM balance_transactions
+        )
+        UPDATE balance_transactions bt
+        SET balance = rc.new_balance
+        FROM running_calc rc
+        WHERE bt.id = rc.id
+      `);
+
+      // Step 2: Retrieve the final balance
+      const lastRowRes = await dbPool.query(`
+        SELECT balance 
+        FROM balance_transactions 
+        ORDER BY date DESC, id DESC 
+        LIMIT 1
+      `);
+      if (lastRowRes.rows.length > 0) {
+        return parseFloat(lastRowRes.rows[0].balance) || 0;
       }
-      return runningBalance;
     } catch (e: any) {
       console.error("Failed to recalculate Postgres balances:", e.message);
     }
@@ -2038,18 +2065,7 @@ export async function createBalanceTransaction(transactionData: any): Promise<an
       );
 
       // Recalculate ALL running balances in Postgres chronologically!
-      const rowsRes = await query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
-      let runningBalance = 0;
-      for (const row of rowsRes.rows) {
-        const amt = parseFloat(row.amount);
-        if (row.type === "Income") {
-          runningBalance += amt;
-        } else {
-          runningBalance -= amt;
-        }
-        await query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
-      }
-
+      const runningBalance = await recalculatePostgresBalances();
       await query("COMMIT");
       return { success: true, transactionId, newBalance: runningBalance };
     } catch (e: any) {
@@ -2099,18 +2115,7 @@ export async function deleteBalanceTransaction(transactionId: string): Promise<a
       await query("DELETE FROM balance_transactions WHERE id = $1", [transactionId]);
       
       // Recalculate subsequent running balances in Postgres chronologically!
-      const rowsRes = await query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
-      let runningBalance = 0;
-      for (const row of rowsRes.rows) {
-        const amt = parseFloat(row.amount);
-        if (row.type === "Income") {
-          runningBalance += amt;
-        } else {
-          runningBalance -= amt;
-        }
-        await query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
-      }
-
+      await recalculatePostgresBalances();
       await query("COMMIT");
       return { success: true, deletedRows: 1 };
     } catch (e) {

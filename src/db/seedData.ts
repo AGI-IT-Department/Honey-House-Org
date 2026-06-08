@@ -209,14 +209,14 @@ export const SEED_BATCHES: BatchSeed[] = [
     locationEgypt: "sharqia",
     flightDetails: "from cairo to sharjah",
     arrivalDate: "2025-12-03",
-    status: "Active",
+    status: "Inactive",
     notes: "15 kg honey +10 kg beeswax",
     items: [
-      { productName: "Honey 1kg", quantity: 25, purchasePrice: 11, shippingPrice: 10, localCost: 3, totalCost: 24, status: "Active" },
-      { productName: "Honey 500g", quantity: 0, purchasePrice: 5.5, shippingPrice: 5, localCost: 2.1, totalCost: 12.6, status: "Active" },
-      { productName: "beeswax 500g", quantity: 0, purchasePrice: 6, shippingPrice: 5, localCost: 5, totalCost: 16, status: "Active" },
-      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Active" },
-      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 1.7, totalCost: 6.95, status: "Active" }
+      { productName: "Honey 1kg", quantity: 25, purchasePrice: 11, shippingPrice: 10, localCost: 3, totalCost: 24, status: "Inactive" },
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5.5, shippingPrice: 5, localCost: 2.1, totalCost: 12.6, status: "Inactive" },
+      { productName: "beeswax 500g", quantity: 0, purchasePrice: 6, shippingPrice: 5, localCost: 5, totalCost: 16, status: "Inactive" },
+      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Inactive" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 1.7, totalCost: 6.95, status: "Inactive" }
     ]
   },
   {
@@ -228,16 +228,16 @@ export const SEED_BATCHES: BatchSeed[] = [
     locationEgypt: "cairo",
     flightDetails: "from ciro to dubai",
     arrivalDate: "2025-12-15",
-    status: "Active",
+    status: "Inactive",
     notes: "20 kg honey",
     items: [
-      { productName: "Honey 1kg", quantity: 20, purchasePrice: 11.5, shippingPrice: 8, localCost: 3, totalCost: 22.5, status: "Active" },
-      { productName: "Honey 500g", quantity: 0, purchasePrice: 5.5, shippingPrice: 5, localCost: 2.1, totalCost: 12.6, status: "Active" },
-      { productName: "Honey (Squeeze 500g)", quantity: 0, purchasePrice: 5.5, shippingPrice: 5, localCost: 4, totalCost: 14.5, status: "Active" },
-      { productName: "Honey (Squeeze 250g)", quantity: 0, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 3, totalCost: 8.25, status: "Active" },
-      { productName: "beeswax 500g", quantity: 0, purchasePrice: 6, shippingPrice: 5, localCost: 5, totalCost: 16, status: "Active" },
-      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Active" },
-      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 1.7, totalCost: 6.95, status: "Active" }
+      { productName: "Honey 1kg", quantity: 20, purchasePrice: 11.5, shippingPrice: 8, localCost: 3, totalCost: 22.5, status: "Inactive" },
+      { productName: "Honey 500g", quantity: 0, purchasePrice: 5.5, shippingPrice: 5, localCost: 2.1, totalCost: 12.6, status: "Inactive" },
+      { productName: "Honey (Squeeze 500g)", quantity: 0, purchasePrice: 5.5, shippingPrice: 5, localCost: 4, totalCost: 14.5, status: "Inactive" },
+      { productName: "Honey (Squeeze 250g)", quantity: 0, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 3, totalCost: 8.25, status: "Inactive" },
+      { productName: "beeswax 500g", quantity: 0, purchasePrice: 6, shippingPrice: 5, localCost: 5, totalCost: 16, status: "Inactive" },
+      { productName: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", quantity: 0, purchasePrice: 19.5, shippingPrice: 5.5, localCost: 2, totalCost: 27, status: "Inactive" },
+      { productName: "Honey 250g", quantity: 0, purchasePrice: 2.75, shippingPrice: 2.5, localCost: 1.7, totalCost: 6.95, status: "Inactive" }
     ]
   },
   {
