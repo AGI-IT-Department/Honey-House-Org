@@ -2948,7 +2948,7 @@ export default function App() {
                 {newOrder.products.map((item, index) => {
                   const avOptions: any[] = (item as any).availableProductsOptions || [];
                   const activeBatches = batchIdsWithStatus.filter(b => 
-                    b.availableWeight > 0 || item.batchId === b.batchId
+                    (b.status === "Active" && b.availableWeight > 0) || item.batchId === b.batchId
                   );
 
                   return (
@@ -2997,15 +2997,11 @@ export default function App() {
                         <input
                           type="number"
                           min={1}
-                          max={item.availableQuantity || 9999}
                           value={item.quantity}
                           onChange={e => handleProductRowChange(index, "quantity", parseInt(e.target.value) || 1)}
                           required
                           className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold focus:ring-1 focus:ring-blue-500"
                         />
-                        {item.availableQuantity > 0 && (
-                          <p className="text-[9px] text-blue-600 font-bold mt-0.5">Max allowed: {item.availableQuantity}</p>
-                        )}
                       </div>
 
                       <div>
