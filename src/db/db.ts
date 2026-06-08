@@ -177,6 +177,8 @@ export async function initDb(): Promise<boolean> {
     // Dynamic runtime schema upgrades / migrations
     await client.query(`
       ALTER TABLE batches ADD COLUMN IF NOT EXISTS total_weight_kg DECIMAL(10, 2) DEFAULT 0;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS shipping_cost DECIMAL(10, 2) DEFAULT 0;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS local_cost DECIMAL(10, 2) DEFAULT 0;
     `);
 
     // Perform database seeding if empty
@@ -1909,19 +1911,8 @@ export async function createBalanceTransaction(transactionData: any): Promise<an
 
   if (usePostgres) {
     try {
-      // Begin transaction to compute running balanced values accurately
       await query("BEGIN");
       
-      const lastBalRes = await query("SELECT balance FROM balance_transactions ORDER BY date DESC, id DESC LIMIT 1");
-      const lastBalance = lastBalRes.rows.length > 0 ? parseFloat(lastBalRes.rows[0].balance) : 0;
-      
-      let newBalance = lastBalance;
-      if (transactionData.type === "Income") {
-        newBalance += amount;
-      } else {
-        newBalance -= amount;
-      }
-
       await query(
         `INSERT INTO balance_transactions (id, date, type, details, amount, balance, note)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -1930,13 +1921,25 @@ export async function createBalanceTransaction(transactionData: any): Promise<an
            type = EXCLUDED.type,
            details = EXCLUDED.details,
            amount = EXCLUDED.amount,
-           balance = EXCLUDED.balance,
            note = EXCLUDED.note`,
-        [transactionId, transactionData.date, transactionData.type, transactionData.details, amount, newBalance, transactionData.note]
+        [transactionId, transactionData.date, transactionData.type, transactionData.details, amount, 0.0, transactionData.note]
       );
 
+      // Recalculate ALL running balances in Postgres chronologically!
+      const rowsRes = await query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
+      let runningBalance = 0;
+      for (const row of rowsRes.rows) {
+        const amt = parseFloat(row.amount);
+        if (row.type === "Income") {
+          runningBalance += amt;
+        } else {
+          runningBalance -= amt;
+        }
+        await query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
+      }
+
       await query("COMMIT");
-      return { success: true, transactionId, newBalance };
+      return { success: true, transactionId, newBalance: runningBalance };
     } catch (e: any) {
       await query("ROLLBACK");
       console.error("Postgres createBalanceTransaction failed. falls back. Error:", e.message);
@@ -1945,22 +1948,13 @@ export async function createBalanceTransaction(transactionData: any): Promise<an
 
   // Fallback memory state calculation
   const idx = memBalance.findIndex(b => b.id === transactionId);
-  const lastBalance = memBalance[memBalance.length - 1]?.balance || 0;
-  let newBalance = lastBalance;
-
-  if (transactionData.type === "Income") {
-    newBalance += amount;
-  } else {
-    newBalance -= amount;
-  }
-
   const payload: BalanceSeed = {
     id: transactionId,
     date: transactionData.date,
     type: transactionData.type,
     details: transactionData.details,
     amount: amount,
-    balance: newBalance,
+    balance: 0,
     note: transactionData.note || ""
   };
 
@@ -1982,7 +1976,8 @@ export async function createBalanceTransaction(transactionData: any): Promise<an
     b.balance = running;
   });
 
-  return { success: true, transactionId, newBalance };
+  const finalBalObj = memBalance.find(b => b.id === transactionId);
+  return { success: true, transactionId, newBalance: finalBalObj ? finalBalObj.balance : running };
 }
 
 export async function deleteBalanceTransaction(transactionId: string): Promise<any> {
@@ -2400,28 +2395,32 @@ export interface ProductCatalogItem {
   name: string;
   weight_g: number;
   purchase_price: number;
+  shipping_cost: number;
+  local_cost: number;
   selling_price: number;
   notes?: string;
 }
 
 export let memProducts: ProductCatalogItem[] = [
-  { name: "Honey 1kg", weight_g: 1000, purchase_price: 10.5, selling_price: 50, notes: "Default 1kg honey" },
-  { name: "Honey 500g", weight_g: 500, purchase_price: 5.5, selling_price: 30, notes: "Default 500g honey" },
-  { name: "Honey 250g", weight_g: 250, purchase_price: 2.75, selling_price: 18, notes: "Default 250g honey" },
-  { name: "Honey (Squeeze 250g)", weight_g: 250, purchase_price: 2.75, selling_price: 20, notes: "Default squeeze 250g" },
-  { name: "Honey (Squeeze 500g)", weight_g: 500, purchase_price: 5.5, selling_price: 35, notes: "Default squeeze 500g" },
-  { name: "beeswax 500g", weight_g: 500, purchase_price: 5.5, selling_price: 40, notes: "Default beeswax 500g" },
-  { name: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", weight_g: 500, purchase_price: 8.0, selling_price: 60, notes: "Default energy package" }
+  { name: "Honey 1kg", weight_g: 1000, purchase_price: 10.5, shipping_cost: 0, local_cost: 0, selling_price: 50, notes: "Default 1kg honey" },
+  { name: "Honey 500g", weight_g: 500, purchase_price: 5.5, shipping_cost: 0, local_cost: 0, selling_price: 30, notes: "Default 500g honey" },
+  { name: "Honey 250g", weight_g: 250, purchase_price: 2.75, shipping_cost: 0, local_cost: 0, selling_price: 18, notes: "Default 250g honey" },
+  { name: "Honey (Squeeze 250g)", weight_g: 250, purchase_price: 2.75, shipping_cost: 0, local_cost: 0, selling_price: 20, notes: "Default squeeze 250g" },
+  { name: "Honey (Squeeze 500g)", weight_g: 500, purchase_price: 5.5, shipping_cost: 0, local_cost: 0, selling_price: 35, notes: "Default squeeze 500g" },
+  { name: "beeswax 500g", weight_g: 500, purchase_price: 5.5, shipping_cost: 0, local_cost: 0, selling_price: 40, notes: "Default beeswax 500g" },
+  { name: "Energy Package (500g honey + 10g Royal Jelly+ 10g Pollen)", weight_g: 500, purchase_price: 8.0, shipping_cost: 0, local_cost: 0, selling_price: 60, notes: "Default energy package" }
 ];
 
 export async function getProducts(): Promise<ProductCatalogItem[]> {
   if (usePostgres) {
     try {
-      const res = await query("SELECT name, weight_g, purchase_price, selling_price, notes FROM products ORDER BY name ASC");
+      const res = await query("SELECT name, weight_g, purchase_price, COALESCE(shipping_cost, 0) as shipping_cost, COALESCE(local_cost, 0) as local_cost, selling_price, notes FROM products ORDER BY name ASC");
       return res.rows.map(r => ({
         name: r.name,
         weight_g: parseFloat(r.weight_g) || 0,
         purchase_price: parseFloat(r.purchase_price) || 0,
+        shipping_cost: parseFloat(r.shipping_cost) || 0,
+        local_cost: parseFloat(r.local_cost) || 0,
         selling_price: parseFloat(r.selling_price) || 0,
         notes: r.notes || ""
       }));
@@ -2436,14 +2435,16 @@ export async function createProduct(prod: ProductCatalogItem): Promise<any> {
   if (usePostgres) {
     try {
       await query(
-        `INSERT INTO products (name, weight_g, purchase_price, selling_price, notes)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO products (name, weight_g, purchase_price, shipping_cost, local_cost, selling_price, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (name) DO UPDATE SET
            weight_g = EXCLUDED.weight_g,
            purchase_price = EXCLUDED.purchase_price,
+           shipping_cost = EXCLUDED.shipping_cost,
+           local_cost = EXCLUDED.local_cost,
            selling_price = EXCLUDED.selling_price,
            notes = EXCLUDED.notes`,
-        [prod.name, prod.weight_g, prod.purchase_price, prod.selling_price, prod.notes || ""]
+        [prod.name, prod.weight_g, prod.purchase_price, prod.shipping_cost, prod.local_cost, prod.selling_price, prod.notes || ""]
       );
       await refreshProductWeightsMap();
       return { success: true, name: prod.name };
@@ -2469,16 +2470,16 @@ export async function updateProduct(originalName: string, prod: ProductCatalogIt
       if (originalName !== prod.name) {
         await query(
           `UPDATE products 
-           SET name = $1, weight_g = $2, purchase_price = $3, selling_price = $4, notes = $5
-           WHERE name = $6`,
-          [prod.name, prod.weight_g, prod.purchase_price, prod.selling_price, prod.notes || "", originalName]
+           SET name = $1, weight_g = $2, purchase_price = $3, shipping_cost = $4, local_cost = $5, selling_price = $6, notes = $7
+           WHERE name = $8`,
+          [prod.name, prod.weight_g, prod.purchase_price, prod.shipping_cost, prod.local_cost, prod.selling_price, prod.notes || "", originalName]
         );
       } else {
         await query(
           `UPDATE products 
-           SET weight_g = $1, purchase_price = $2, selling_price = $3, notes = $4
-           WHERE name = $5`,
-          [prod.weight_g, prod.purchase_price, prod.selling_price, prod.notes || "", originalName]
+           SET weight_g = $1, purchase_price = $2, shipping_cost = $3, local_cost = $4, selling_price = $5, notes = $6
+           WHERE name = $7`,
+          [prod.weight_g, prod.purchase_price, prod.shipping_cost, prod.local_cost, prod.selling_price, prod.notes || "", originalName]
         );
       }
       await refreshProductWeightsMap();

@@ -158,7 +158,8 @@ export default function App() {
   // Dynamic Catalog State
   const [productsCatalog, setProductsCatalog] = useState<any[]>([]);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
-  const [newProductForm, setNewProductForm] = useState({ name: "", weight_g: 500, purchase_price: 10, selling_price: 25, notes: "" });
+  const [newProductForm, setNewProductForm] = useState({ name: "", weight_g: 500, purchase_price: 10, shipping_cost: 0, local_cost: 0, selling_price: 25, notes: "" });
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
   // Navigation Tabs
   const [ordersTab, setOrdersTab] = useState<"view" | "create">("view");
@@ -197,6 +198,9 @@ export default function App() {
 
   // Search States
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("");
+  const [sortPurchaseValue, setSortPurchaseValue] = useState("");
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
 
   // Core Data Stores
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
@@ -264,6 +268,8 @@ export default function App() {
   const [editCustomerObj, setEditCustomerObj] = useState<Customer | null>(null);
   const [editBatchId, setEditBatchId] = useState<string | null>(null);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
+  const [editLedgerId, setEditLedgerId] = useState<string | null>(null);
   const [customerSearchDropdown, setCustomerSearchDropdown] = useState<any[]>([]);
 
   // Available months cache
@@ -378,6 +384,17 @@ export default function App() {
       const res = await fetch("/api/customers");
       const data = await res.json();
       setCustomers(data);
+      if (Array.isArray(data)) {
+        const uniqueLocs = Array.from(
+          new Set(
+            data
+              .map((c: any) => c["Customer Location"])
+              .filter(Boolean)
+              .map((l: string) => l.trim())
+          )
+        ).sort() as string[];
+        setAvailableLocations(uniqueLocs);
+      }
     } catch (e) {
       showToast("Error retrieving customers roster.", "danger");
     }
@@ -403,7 +420,8 @@ export default function App() {
       });
       if (res.ok) {
         showToast("Product created successfully", "success");
-        setNewProductForm({ name: "", weight_g: 500, purchase_price: 10, selling_price: 25, notes: "" });
+        setNewProductForm({ name: "", weight_g: 500, purchase_price: 10, shipping_cost: 0, local_cost: 0, selling_price: 25, notes: "" });
+        setIsProductModalOpen(false);
         fetchProductsCatalog();
       } else {
         showToast("Failed to create product", "danger");
@@ -417,7 +435,7 @@ export default function App() {
     e.preventDefault();
     if (!editingProduct) return;
     try {
-      const res = await fetch(`/api/products/${encodeURIComponent(editingProduct.name)}`, {
+      const res = await fetch(`/api/products/${encodeURIComponent(editingProduct.name || editingProduct.Name)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingProduct)
@@ -425,6 +443,7 @@ export default function App() {
       if (res.ok) {
         showToast("Product updated successfully", "success");
         setEditingProduct(null);
+        setIsProductModalOpen(false);
         fetchProductsCatalog();
       } else {
         showToast("Failed to update product", "danger");
@@ -969,14 +988,23 @@ export default function App() {
       return;
     }
     try {
+      const payload = {
+        ...newBalance,
+        ...(editLedgerId ? { transactionId: editLedgerId } : {})
+      };
       const res = await fetch("/api/balance/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newBalance)
+        body: JSON.stringify(payload)
       });
       const r = await res.json();
       if (r.success) {
-        showToast(`Ledger updated! New cumulative balance: ${r.newBalance.toFixed(2)} AED`, "success");
+        showToast(
+          editLedgerId 
+            ? `Ledger transaction ${editLedgerId} updated correctly! Running balances recalculated.`
+            : `Ledger updated! New cumulative balance: ${r.newBalance.toFixed(2)} AED`, 
+          "success"
+        );
         setNewBalance({
           type: "Income",
           details: "",
@@ -984,6 +1012,8 @@ export default function App() {
           note: "",
           date: new Date().toISOString().split("T")[0]
         });
+        setEditLedgerId(null);
+        setIsLedgerModalOpen(false);
         fetchBalanceTransactions();
         fetchDashboardData();
       }
@@ -1032,6 +1062,20 @@ export default function App() {
   const formatAED = (val: number | undefined) => {
     return (val || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " AED";
   };
+
+  // Filtered and Sorted Customers
+  let displayedCustomers = [...customers];
+  if (selectedLocation) {
+    displayedCustomers = displayedCustomers.filter(c => {
+      const loc = (c["Customer Location"] || "Other").trim().toLowerCase();
+      return loc === selectedLocation.trim().toLowerCase();
+    });
+  }
+  if (sortPurchaseValue === "highest") {
+    displayedCustomers.sort((a, b) => (b["Total Spent"] || 0) - (a["Total Spent"] || 0));
+  } else if (sortPurchaseValue === "lowest") {
+    displayedCustomers.sort((a, b) => (a["Total Spent"] || 0) - (b["Total Spent"] || 0));
+  }
 
   return (
     <div className="flex min-h-screen text-slate-900 bg-[#f1f5f9] font-sans antialiased">
@@ -1210,6 +1254,26 @@ export default function App() {
               >
                 <Plus className="w-4 h-4" />
                 <span>New Batch</span>
+              </button>
+            )}
+            {page === "balance" && (
+              <button
+                onClick={() => {
+                  setNewBalance({
+                    type: "Income",
+                    details: "",
+                    amount: 0,
+                    note: "",
+                    date: new Date().toISOString().split("T")[0]
+                  });
+                  setEditLedgerId(null);
+                  setIsLedgerModalOpen(true);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-emerald-500/10"
+                title="Log a manual cash transaction"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Log Manual Transaction</span>
               </button>
             )}
             <button
@@ -1939,415 +2003,147 @@ export default function App() {
            GENERAL LEDGER VIEW
            ---------------------------------------------------- */}
         {page === "balance" && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-fade-in">
             
-            <div className="flex border-b border-slate-200">
+            {/* Simple Elegant Title & Quick KPI */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-emerald-600" />
+                  <span>Cash Balance Book</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Chronological general ledger of cash flows. Dynamic balances are automatically reconciled.
+                </p>
+              </div>
               <button
-                onClick={() => setBalanceTab("balance")}
-                className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
-                  balanceTab === "balance" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"
-                }`}
-              >
-                Cash Balance Book
-              </button>
-              <button
-                onClick={() => setBalanceTab("expenses")}
-                className={`px-6 py-3 font-semibold text-sm border-b-2 transition ${
-                  balanceTab === "expenses" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"
-                }`}
-              >
-                Business Expenses ledger
-              </button>
-              <button
-                onClick={() => setBalanceTab("add-expense")}
-                className={`px-6 py-3 font-semibold text-sm border-b-2 transition flex items-center gap-2 ${
-                  balanceTab === "add-expense" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"
-                }`}
+                onClick={() => {
+                  setNewBalance({
+                    type: "Income",
+                    details: "",
+                    amount: 0,
+                    note: "",
+                    date: new Date().toISOString().split("T")[0]
+                  });
+                  setEditLedgerId(null);
+                  setIsLedgerModalOpen(true);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-emerald-500/10 self-stretch md:self-auto justify-center"
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Expense</span>
+                <span>+ Log Manual Transaction</span>
               </button>
             </div>
 
-            {/* TAB 1: CASH BALANCE BOOK */}
-            {balanceTab === "balance" && (
-              <div className="space-y-8">
-                
-                {/* Ledger manual insertion form */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  
-                  {/* Ledger form */}
-                  <form onSubmit={saveBalanceEntry} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 h-fit">
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5 uppercase tracking-wide">
-                        <Plus className="w-4 h-4 text-blue-600" />
-                        <span>Log Manual Transaction</span>
-                      </h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Inject capital, initial bank seed, or manual adjustments.</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Transaction type</label>
-                      <select
-                        value={newBalance.type}
-                        onChange={e => setNewBalance(prev => ({ ...prev, type: e.target.value }))}
-                        className="w-full bg-slate-50/50 border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                      >
-                        <option value="Income">Income (Deposit)</option>
-                        <option value="Expense">Expense (Withdrawal)</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Amount AED *</label>
-                        <input
-                          type="number"
-                          min={1}
-                          required
-                          value={newBalance.amount || ""}
-                          onChange={e => setNewBalance(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                          className="w-full bg-slate-50/50 border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Post Date</label>
-                        <input
-                          type="date"
-                          value={newBalance.date}
-                          onChange={e => setNewBalance(prev => ({ ...prev, date: e.target.value }))}
-                          className="w-full bg-slate-50/50 border border-slate-200 rounded-lg p-2 text-xs font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Post details</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Bank credit share payment"
-                        value={newBalance.details}
-                        onChange={e => setNewBalance(prev => ({ ...prev, details: e.target.value }))}
-                        required
-                        className="w-full bg-slate-50/50 border border-slate-200 rounded-lg p-2 text-xs"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Post notes</label>
-                      <input
-                        type="text"
-                        placeholder="Internal auditing notes..."
-                        value={newBalance.note}
-                        onChange={e => setNewBalance(prev => ({ ...prev, note: e.target.value }))}
-                        className="w-full bg-slate-50/50 border border-slate-200 rounded-lg p-2 text-xs"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full bg-slate-900 text-white py-2 rounded-lg text-xs font-bold hover:bg-slate-800 transition uppercase tracking-wider"
-                    >
-                      Post Ledger Entry
-                    </button>
-                  </form>
-
-                  {/* Ledger list view */}
-                  <div className="lg:col-span-2 space-y-6">
-                    
-                    <section className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-end gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Filter Months</label>
-                        <select
-                          value={balMonth}
-                          onChange={e => setBalMonth(e.target.value)}
-                          className="bg-slate-55 border border-slate-200 rounded-lg p-1.5 text-xs font-semibold"
-                        >
-                          <option value="">AllMonths</option>
-                          {monthsList.map(m => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Category Type</label>
-                        <select
-                          value={balType}
-                          onChange={e => setBalType(e.target.value)}
-                          className="bg-slate-55 border border-slate-200 rounded-lg p-1.5 text-xs font-semibold border-slate-200/80"
-                        >
-                          <option value="all">All Types</option>
-                          <option value="Income">Income (Inflow)</option>
-                          <option value="Expense">Expense (Outflow)</option>
-                        </select>
-                      </div>
-
-                      <button
-                        onClick={fetchBalanceTransactions}
-                        className="bg-slate-900 text-white rounded-lg text-xs font-semibold px-4 py-2 hover:bg-slate-800 transition"
-                      >
-                        Apply Filter
-                      </button>
-                    </section>
-
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200 text-slate-450 uppercase font-bold text-[10px]">
-                            <th className="p-3">Reference ID</th>
-                            <th className="p-3">Date</th>
-                            <th className="p-3">In/Out Inflow</th>
-                            <th className="p-3">Details</th>
-                            <th className="p-3">Movement Cash</th>
-                            <th className="p-3">Running Balance</th>
-                            <th className="p-3 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-mono">
-                          {balanceTransactions.map((tr, index) => (
-                            <tr key={index} className="hover:bg-slate-50/50 transition">
-                              <td className="p-3 text-[10px] font-bold text-slate-450">{tr["Transaction ID"]}</td>
-                              <td className="p-3 text-slate-650">{tr.Date}</td>
-                              <td className="p-3 truncate font-sans">
-                                <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                  tr.Type === "Income" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-                                }`}>
-                                  {tr.Type}
-                                </span>
-                              </td>
-                              <td className="p-3 truncate max-w-[150px] font-sans text-slate-800 font-medium" title={tr.Details}>{tr.Details}</td>
-                              <td className={`p-3 font-semibold ${tr.Type === "Income" ? "text-emerald-600" : "text-rose-500"}`}>
-                                {tr.Type === "Income" ? "+" : "-"}{tr.Amount.toFixed(1)}
-                              </td>
-                              <td className="p-3 font-extrabold text-slate-900">{tr.Balance.toFixed(1)}</td>
-                              <td className="p-3 text-right">
-                                <button
-                                  onClick={() => handleDeleteBalance(tr["Transaction ID"])}
-                                  className="text-slate-400 hover:text-rose-600 p-1 rounded transition"
-                                >
-                                  <Trash2 className="w-4.5 h-4.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                  </div>
-
-                </div>
-
-              </div>
-            )}
-
-            {/* TAB 2: BUSINESS EXPENSES LEDGER */}
-            {balanceTab === "expenses" && (
-              <div className="space-y-6">
-                
-                <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-end">
-                  <div className="w-[180px]">
-                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Month Filter</label>
-                    <select
-                      value={expMonth}
-                      onChange={e => setExpMonth(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs"
-                    >
-                      <option value="">All Months</option>
-                      {monthsList.map(m => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="w-[185px]">
-                    <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Category Type</label>
-                    <select
-                      value={expType}
-                      onChange={e => setExpType(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs"
-                    >
-                      <option value="all">All Expenses</option>
-                      <option value="Expense">Business Expenses</option>
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={fetchExpenses}
-                    className="bg-slate-900 text-white rounded-lg text-xs font-bold px-6 py-2.5 hover:bg-slate-800 transition"
-                  >
-                    Filter list
-                  </button>
-                </section>
-
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-450 uppercase font-bold text-[10px]">
-                        <th className="p-4">ID</th>
-                        <th className="p-4">Post Date</th>
-                        <th className="p-4">Category Type</th>
-                        <th className="p-4">Budget Classification</th>
-                        <th className="p-4">Details Description</th>
-                        <th className="p-4">Cost AED</th>
-                        <th className="p-4">Paid Method</th>
-                        <th className="p-4 text-right">Operations</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                      {expenses.map((exp, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50 transition">
-                          <td className="p-4 font-mono font-bold text-slate-450">{exp["Expense ID"]}</td>
-                          <td className="p-4 whitespace-nowrap font-mono">{exp.Date}</td>
-                          <td className="p-4">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                              exp.Type === "Expense" ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"
-                            }`}>
-                              {exp.Type}
-                            </span>
-                          </td>
-                          <td className="p-4">
-                            <span className="bg-slate-150 text-slate-700 border border-slate-200/50 px-2 py-0.5 rounded text-[10px] font-semibold">{exp.Category}</span>
-                          </td>
-                          <td className="p-4 font-semibold text-slate-900" title={exp.Description}>{exp.Description}</td>
-                          <td className="p-4 font-mono font-bold text-slate-950">{exp.Amount.toFixed(1)}</td>
-                          <td className="p-4">{exp["Payment Method"]}</td>
-                          <td className="p-4 text-right">
-                            <button
-                              onClick={() => handleDeleteExpense(exp["Expense ID"])}
-                              className="text-slate-400 hover:text-rose-600 p-1 rounded transition"
-                            >
-                              <Trash2 className="w-4.5 h-4.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {expenses.length === 0 && (
-                        <tr>
-                          <td colSpan={8} className="p-8 text-center text-slate-400 font-medium font-sans">No expenses logged.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-              </div>
-            )}
-
-            {/* TAB 3: ADD EXPENSE / DISTRIBUTION */}
-            {balanceTab === "add-expense" && (
-              <form onSubmit={saveExpense} className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6 max-w-2xl">
+            {/* Ledger list view */}
+            <div className="space-y-6">
+              
+              <section className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-end gap-3">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-                    <Plus className="w-5 h-5 text-blue-600" />
-                    <span>Log Expense Ledger Event</span>
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Date</label>
-                    <input
-                      type="date"
-                      value={newExpense.date}
-                      onChange={e => setNewExpense(prev => ({ ...prev, date: e.target.value }))}
-                      required
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono focus:bg-white transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Budget Classification</label>
-                    <input
-                      type="text"
-                      value="Business Expenses"
-                      disabled
-                      className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-500 cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Category *</label>
-                    <select
-                      value={newExpense.category}
-                      onChange={e => setNewExpense(prev => ({ ...prev, category: e.target.value }))}
-                      required
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:bg-white transition"
-                    >
-                      <option value="">Select Category</option>
-                      {expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Amount (AED) *</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={newExpense.amount || ""}
-                      onChange={e => setNewExpense(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                      required
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-bold focus:bg-white transition"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-500 uppercase">Event Description / Details *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Monthly rent payout or shareholder dividend share..."
-                    value={newExpense.description}
-                    onChange={e => setNewExpense(prev => ({ ...prev, description: e.target.value }))}
-                    required
-                    className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:bg-white transition"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Payment Method</label>
-                    <select
-                      value={newExpense.paymentMethod}
-                      onChange={e => setNewExpense(prev => ({ ...prev, paymentMethod: e.target.value }))}
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:bg-white transition"
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="Bank Transfer">Bank Transfer</option>
-                      <option value="Credit Card">Credit Card</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Reference Number</label>
-                    <input
-                      type="text"
-                      placeholder="Receipt or bill transaction hash..."
-                      value={newExpense.reference}
-                      onChange={e => setNewExpense(prev => ({ ...prev, reference: e.target.value }))}
-                      className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:bg-white transition"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setBalanceTab("expenses")}
-                    className="bg-slate-105 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Filter Months</label>
+                  <select
+                    value={balMonth}
+                    onChange={e => setBalMonth(e.target.value)}
+                    className="bg-slate-55 border border-slate-200 rounded-lg p-1.5 text-xs font-semibold"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-blue-600 text-white hover:bg-blue-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition"
-                  >
-                    Post Expense Ledger
-                  </button>
+                    <option value="">AllMonths</option>
+                    {monthsList.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
                 </div>
-              </form>
-            )}
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Category Type</label>
+                  <select
+                    value={balType}
+                    onChange={e => setBalType(e.target.value)}
+                    className="bg-slate-55 border border-slate-200 rounded-lg p-1.5 text-xs font-semibold border-slate-200/80"
+                  >
+                    <option value="all">All Types</option>
+                    <option value="Income">Income (Inflow)</option>
+                    <option value="Expense">Expense (Outflow)</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={fetchBalanceTransactions}
+                  className="bg-slate-900 text-white rounded-lg text-xs font-semibold px-4 py-2 hover:bg-slate-805 transition"
+                >
+                  Apply Filter
+                </button>
+              </section>
+
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <table className="w-full text-left text-xs border-collapse font-sans">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-450 uppercase font-bold text-[10px]">
+                      <th className="p-3">Reference ID</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">In/Out Inflow</th>
+                      <th className="p-3">Details</th>
+                      <th className="p-3">Movement Cash</th>
+                      <th className="p-3 font-semibold">Running Balance</th>
+                      <th className="p-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                    {balanceTransactions.map((tr, index) => (
+                      <tr key={index} className="hover:bg-slate-50/50 transition">
+                        <td className="p-3 text-[10.5px] font-bold text-slate-450">{tr["Transaction ID"]}</td>
+                        <td className="p-3 text-slate-600">{tr.Date}</td>
+                        <td className="p-3 truncate">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                            tr.Type === "Income" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                          }`}>
+                            {tr.Type}
+                          </span>
+                        </td>
+                        <td className="p-3 truncate max-w-[250px] font-sans text-slate-800 font-medium" title={tr.Details}>{tr.Details}</td>
+                        <td className={`p-3 font-bold font-mono ${tr.Type === "Income" ? "text-emerald-600" : "text-rose-500"}`}>
+                          {tr.Type === "Income" ? "+" : "-"}{tr.Amount.toFixed(1)}
+                        </td>
+                        <td className="p-3 font-extrabold font-mono text-slate-900">{tr.Balance.toFixed(1)}</td>
+                        <td className="p-3 text-right font-sans">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setNewBalance({
+                                  type: tr.Type,
+                                  details: tr.Details,
+                                  amount: tr.Amount,
+                                  note: tr.Note || "",
+                                  date: tr.Date
+                                });
+                                setEditLedgerId(tr["Transaction ID"]);
+                                setIsLedgerModalOpen(true);
+                              }}
+                              className="text-slate-400 hover:text-blue-600 p-1.5 rounded hover:bg-slate-100 transition"
+                              title="Edit manual transaction"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBalance(tr["Transaction ID"])}
+                              className="text-slate-400 hover:text-rose-600 p-1.5 rounded hover:bg-slate-100 transition"
+                              title="Delete manual transaction"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {balanceTransactions.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-slate-400 font-sans font-medium">No ledger entries match these filters.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
 
           </div>
         )}
@@ -2356,36 +2152,65 @@ export default function App() {
            CUSTOMERS ROSTER VIEW
            ---------------------------------------------------- */}
         {page === "customers" && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-fade-in">
             
             {/* Find customer ribbon */}
-            <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
-              <div className="relative flex-1 max-w-md">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="w-4 h-4 text-slate-450" />
+            <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1">
+                {/* Search query input */}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search by name or phone number..."
+                    value={customerSearchQuery}
+                    onChange={e => {
+                      setCustomerSearchQuery(e.target.value);
+                      if (e.target.value === "") {
+                        fetchCustomers();
+                      } else {
+                        // Apply inline search on searchCustomers API
+                        fetch(`/api/customers/search?query=${encodeURIComponent(e.target.value)}`)
+                          .then(r => r.json())
+                          .then(data => setCustomers(data));
+                      }
+                    }}
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-800 focus:bg-white transition"
+                  />
                 </div>
-                <input
-                  type="text"
-                  placeholder="Filter client records by name pattern or phone digits..."
-                  value={customerSearchQuery}
-                  onChange={e => {
-                    setCustomerSearchQuery(e.target.value);
-                    setCustomerSearchQuery(e.target.value);
-                    if (e.target.value === "") {
-                      fetchCustomers();
-                    } else {
-                      // Apply inline search on searchCustomers API
-                      fetch(`/api/customers/search?query=${encodeURIComponent(e.target.value)}`)
-                        .then(r => r.json())
-                        .then(data => setCustomers(data));
-                    }
-                  }}
-                  className="w-full bg-slate-50/60 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:bg-white transition"
-                />
+
+                {/* Location Filter */}
+                <div>
+                  <select
+                    value={selectedLocation}
+                    onChange={e => setSelectedLocation(e.target.value)}
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition text-slate-800"
+                  >
+                    <option value="">All Locations</option>
+                    {availableLocations.map(loc => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Purchase value sorter */}
+                <div>
+                  <select
+                    value={sortPurchaseValue}
+                    onChange={e => setSortPurchaseValue(e.target.value)}
+                    className="w-full bg-slate-50/60 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition text-slate-800"
+                  >
+                    <option value="">Default Sort</option>
+                    <option value="highest">Highest Spender</option>
+                    <option value="lowest">Lowest Spender</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                Total active clients: <span className="font-mono text-slate-900 bg-slate-100 px-2.5 py-1 rounded border border-slate-200/80">{customers.length}</span>
+              <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider flex-shrink-0 bg-slate-50 border border-slate-100 px-4 py-2 rounded-xl self-start lg:self-auto">
+                Total active clients: <span className="font-mono text-slate-900 bg-white px-2.5 py-1 rounded border border-slate-200/80 ml-1.5">{displayedCustomers.length}</span>
               </div>
             </section>
 
@@ -2404,7 +2229,7 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {customers.map((c, idx) => (
+                  {displayedCustomers.map((c, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/50 transition">
                       <td className="p-4 font-mono font-bold text-slate-450">{c["Customer ID"]}</td>
                       <td className="p-4 font-semibold text-slate-900">{c["Customer Name"]}</td>
@@ -2426,7 +2251,7 @@ export default function App() {
                       </td>
                     </tr>
                   ))}
-                  {customers.length === 0 && (
+                  {displayedCustomers.length === 0 && (
                     <tr>
                       <td colSpan={7} className="p-8 text-center text-slate-400 font-medium font-sans">No customer profiles found.</td>
                     </tr>
@@ -2444,7 +2269,7 @@ export default function App() {
            PRODUCT CATALOG VIEW (PRODUCT CATALOG SETUP)
            ---------------------------------------------------- */}
         {page === "products" && (
-          <div className="space-y-8 animate-fadeIn">
+          <div className="space-y-6 animate-fade-in">
             
             {/* Header and Quick stats */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2463,9 +2288,10 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setEditingProduct(null);
-                    setNewProductForm({ name: "", weight_g: 500, purchase_price: 10, selling_price: 25, notes: "" });
+                    setNewProductForm({ name: "", weight_g: 500, purchase_price: 10, shipping_cost: 0, local_cost: 0, selling_price: 25, notes: "" });
+                    setIsProductModalOpen(true);
                   }}
-                  className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add New Product</span>
@@ -2473,235 +2299,324 @@ export default function App() {
               </div>
             </div>
 
-            {/* Catalog Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
-              {/* Left Column: Form (Form is shown dynamically if adding/editing) */}
-              <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit">
-                <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
-                  <span>{editingProduct ? "Edit Product Info" : "Create Product Setup"}</span>
-                  <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    {editingProduct ? "Modification" : "Insertion"}
+            {/* Catalog Panel (Now full width) */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-700 tracking-wider uppercase">Active Enterprise Products Catalog</span>
+                  <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full font-bold">
+                    {productsCatalog.length} products total
                   </span>
-                </h4>
+                </div>
 
-                <form onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct} className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Product Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Honey (Squeeze 400g)"
-                      value={editingProduct ? editingProduct.name : newProductForm.name}
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (editingProduct) {
-                          setEditingProduct(prev => prev ? { ...prev, name: val } : null);
-                        } else {
-                          setNewProductForm(prev => ({ ...prev, name: val }));
-                        }
-                      }}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
-                    />
-                  </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50/30 text-slate-500 uppercase tracking-widest text-[9px] font-extrabold border-b border-slate-100">
+                        <th className="px-6 py-4">Product Details & Specs</th>
+                        <th className="px-5 py-4">Weight (g) / Size</th>
+                        <th className="px-5 py-4">Costs Breakdown (AED)</th>
+                        <th className="px-5 py-4">Total Cost</th>
+                        <th className="px-5 py-4">Standard Sell</th>
+                        <th className="px-5 py-4">Expected Profit</th>
+                        <th className="px-6 py-4 text-right w-[160px]">Operations</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                      {productsCatalog.map((prod, idx) => {
+                        const pCost = parseFloat(prod.purchase_price) || 0;
+                        const sCost = parseFloat(prod.shipping_cost) || 0;
+                        const lCost = parseFloat(prod.local_cost) || 0;
+                        const totalCost = pCost + sCost + lCost;
+                        const profit = (parseFloat(prod.selling_price) || 0) - totalCost;
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (Grams) *</label>
-                      <input
-                        type="number"
-                        min={0}
-                        required
-                        placeholder="e.g. 500"
-                        value={editingProduct ? editingProduct.weight_g : newProductForm.weight_g}
-                        onChange={e => {
-                          const val = parseInt(e.target.value) || 0;
-                          if (editingProduct) {
-                            setEditingProduct(prev => prev ? { ...prev, weight_g: val } : null);
-                          } else {
-                            setNewProductForm(prev => ({ ...prev, weight_g: val }));
-                          }
-                        }}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (KG)</label>
-                      <div className="w-full bg-slate-100 border border-slate-200/60 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-400">
-                        {(((editingProduct ? editingProduct.weight_g : newProductForm.weight_g) || 0) / 1000).toFixed(3)} kg
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Purchase Price (AED) *</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        required
-                        placeholder="e.g. 10.50"
-                        value={editingProduct ? editingProduct.purchase_price : newProductForm.purchase_price}
-                        onChange={e => {
-                          const val = parseFloat(e.target.value) || 0;
-                          if (editingProduct) {
-                            setEditingProduct(prev => prev ? { ...prev, purchase_price: val } : null);
-                          } else {
-                            setNewProductForm(prev => ({ ...prev, purchase_price: val }));
-                          }
-                        }}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Selling Price (AED) *</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        required
-                        placeholder="e.g. 35.00"
-                        value={editingProduct ? editingProduct.selling_price : newProductForm.selling_price}
-                        onChange={e => {
-                          const val = parseFloat(e.target.value) || 0;
-                          if (editingProduct) {
-                            setEditingProduct(prev => prev ? { ...prev, selling_price: val } : null);
-                          } else {
-                            setNewProductForm(prev => ({ ...prev, selling_price: val }));
-                          }
-                        }}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Corporate Catalog Notes</label>
-                    <textarea
-                      placeholder="Product packaging, batch constraints..."
-                      rows={2}
-                      value={editingProduct ? editingProduct.notes || "" : newProductForm.notes || ""}
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (editingProduct) {
-                          setEditingProduct(prev => prev ? { ...prev, notes: val } : null);
-                        } else {
-                          setNewProductForm(prev => ({ ...prev, notes: val }));
-                        }
-                      }}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
-                    />
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
-                    {editingProduct && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingProduct(null);
-                        }}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold transition"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                    <button
-                      type="submit"
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl font-extrabold shadow-sm transition"
-                    >
-                      {editingProduct ? "Save Changes" : "Create Product"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Right Column: Catalog Grid Table */}
-              <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
-                <div>
-                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-slate-700 tracking-wider uppercase">Active Enterprise Products Catalog</span>
-                    <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full font-bold">
-                      {productsCatalog.length} products total
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-slate-50/30 text-slate-500 uppercase tracking-widest text-[9px] font-extrabold border-b border-slate-100">
-                          <th className="px-6 py-3.5">Product Details & Specs</th>
-                          <th className="px-5 py-3.5">Weight (g)</th>
-                          <th className="px-5 py-3.5">Purchase price</th>
-                          <th className="px-5 py-3.5">Standard Sell</th>
-                          <th className="px-5 py-3.5">Default profit</th>
-                          <th className="px-6 py-3.5 text-right w-[140px]">Operations</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                        {productsCatalog.map((prod, idx) => {
-                          const profit = prod.selling_price - prod.purchase_price;
-                          return (
-                            <tr key={idx} className="hover:bg-slate-50/50 transition">
-                              <td className="px-6 py-4">
-                                <div className="font-bold text-slate-900 text-xs">{prod.name}</div>
-                                {prod.notes && (
-                                  <div className="text-[10px] text-slate-400 mt-0.5 font-normal line-clamp-1">{prod.notes}</div>
-                                )}
-                              </td>
-                              <td className="px-5 py-4 font-mono font-semibold text-slate-600 text-xs">
-                                {prod.weight_g}g ({prod.weight_g / 1000} kg)
-                              </td>
-                              <td className="px-5 py-4 font-mono text-amber-600 text-xs">
-                                {prod.purchase_price.toFixed(2)} AED
-                              </td>
-                              <td className="px-5 py-4 font-mono text-emerald-600 text-xs">
-                                {prod.selling_price.toFixed(2)} AED
-                              </td>
-                              <td className="px-5 py-4 font-mono">
-                                <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                                  +{profit.toFixed(2)} AED
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEditingProduct(prod);
-                                    }}
-                                    className="p-1 px-2 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-bold flex items-center gap-1 transition"
-                                  >
-                                    <Edit2 className="w-3 h-3" />
-                                    <span>Edit</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteProduct(prod.name)}
-                                    className="p-1 px-2 text-rose-700 hover:bg-rose-50 border border-rose-250 rounded transition text-[10px] font-bold"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/50 transition">
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-slate-900 text-xs">{prod.name}</div>
+                              {prod.notes && (
+                                <div className="text-[10px] text-slate-400 mt-0.5 font-normal line-clamp-1">{prod.notes}</div>
+                              )}
+                            </td>
+                            <td className="px-5 py-4 font-mono font-semibold text-slate-600 text-xs text-nowrap">
+                              {prod.weight_g} g ({(prod.weight_g / 1000).toFixed(3)} kg)
+                            </td>
+                            <td className="px-5 py-4 text-xs">
+                              <div className="font-mono text-[10px] text-slate-500 space-y-0.5">
+                                <div><span className="font-sans text-slate-400">Purch:</span> <span className="font-bold text-slate-700">{pCost.toFixed(2)}</span></div>
+                                <div><span className="font-sans text-slate-400">Shipp:</span> <span className="font-bold text-slate-700">{sCost.toFixed(2)}</span></div>
+                                <div><span className="font-sans text-slate-400">Local:</span> <span className="font-bold text-slate-700">{lCost.toFixed(2)}</span></div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 font-mono text-amber-700 font-bold text-xs">
+                              {totalCost.toFixed(2)} AED
+                            </td>
+                            <td className="px-5 py-4 font-mono text-emerald-600 text-xs font-bold">
+                              {prod.selling_price ? parseFloat(prod.selling_price).toFixed(2) : "0.00"} AED
+                            </td>
+                            <td className="px-5 py-4 font-mono">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${profit >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                                {profit >= 0 ? "+" : ""}{profit.toFixed(2)} AED
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingProduct({
+                                      name: prod.name,
+                                      weight_g: prod.weight_g,
+                                      purchase_price: pCost,
+                                      shipping_cost: sCost,
+                                      local_cost: lCost,
+                                      selling_price: parseFloat(prod.selling_price) || 0,
+                                      notes: prod.notes || ""
+                                    });
+                                    setIsProductModalOpen(true);
+                                  }}
+                                  className="p-1 px-2.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-bold flex items-center gap-1 transition"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteProduct(prod.name)}
+                                  className="p-1 px-2.5 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded transition text-[10px] font-bold text-nowrap"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
 
                 {productsCatalog.length === 0 && (
-                  <div className="text-center py-12 font-bold text-slate-400">
+                  <div className="text-center py-12 font-bold text-slate-400 bg-white">
                     No products present in database catalog. Please define a custom product setup.
                   </div>
                 )}
               </div>
-
             </div>
+
+            {/* Modal Dialog Window for Product Addition & Editing */}
+            {isProductModalOpen && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in py-10 px-4">
+                <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 w-full max-w-lg shadow-2xl space-y-6 animate-scaleUp">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
+                      <Tag className="w-5 h-5 text-amber-500" />
+                      <span>{editingProduct ? "Modify Product Catalog Setup" : "Add New Product Setup"}</span>
+                    </span>
+                    <button type="button" onClick={() => { setIsProductModalOpen(false); setEditingProduct(null); }} className="text-slate-400 hover:text-slate-600 transition">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct} className="space-y-4">
+                    {/* Name */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Product Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Honey (Squeeze 400g)"
+                        value={editingProduct ? editingProduct.name : newProductForm.name}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (editingProduct) {
+                            setEditingProduct(prev => prev ? { ...prev, name: val } : null);
+                          } else {
+                            setNewProductForm(prev => ({ ...prev, name: val }));
+                          }
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                      />
+                    </div>
+
+                    {/* Weight (Grams) */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (Grams) *</label>
+                        <input
+                          type="number"
+                          min={0}
+                          required
+                          placeholder="e.g. 500"
+                          value={editingProduct ? editingProduct.weight_g : newProductForm.weight_g}
+                          onChange={e => {
+                            const val = parseInt(e.target.value) || 0;
+                            if (editingProduct) {
+                              setEditingProduct(prev => prev ? { ...prev, weight_g: val } : null);
+                            } else {
+                              setNewProductForm(prev => ({ ...prev, weight_g: val }));
+                            }
+                          }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-bold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Weight (KG)</label>
+                        <div className="w-full bg-slate-100 border border-slate-200/60 rounded-xl px-4 py-2.5 text-xs font-mono font-bold text-slate-400">
+                          {(((editingProduct ? editingProduct.weight_g : newProductForm.weight_g) || 0) / 1000).toFixed(3)} kg
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Three Costs Grid */}
+                    <div>
+                      <span className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 mb-2">Cost Components (AED)</span>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Purchase Cost *</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            required
+                            placeholder="0.00"
+                            value={editingProduct ? editingProduct.purchase_price : newProductForm.purchase_price}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value) || 0;
+                              if (editingProduct) {
+                                setEditingProduct(prev => prev ? { ...prev, purchase_price: val } : null);
+                              } else {
+                                setNewProductForm(prev => ({ ...prev, purchase_price: val }));
+                              }
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Shipping Cost</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            required
+                            placeholder="0.00"
+                            value={editingProduct ? (editingProduct.shipping_cost ?? 0) : newProductForm.shipping_cost}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value) || 0;
+                              if (editingProduct) {
+                                setEditingProduct(prev => prev ? { ...prev, shipping_cost: val } : null);
+                              } else {
+                                setNewProductForm(prev => ({ ...prev, shipping_cost: val }));
+                              }
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Local & Customs</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            required
+                            placeholder="0.00"
+                            value={editingProduct ? (editingProduct.local_cost ?? 0) : newProductForm.local_cost}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value) || 0;
+                              if (editingProduct) {
+                                setEditingProduct(prev => prev ? { ...prev, local_cost: val } : null);
+                              } else {
+                                setNewProductForm(prev => ({ ...prev, local_cost: val }));
+                              }
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selling price and Preview totals */}
+                    <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div>
+                        <span className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Accumulated Cost</span>
+                        <div className="text-sm font-mono font-bold text-amber-750">
+                          {(() => {
+                            const p = parseFloat(editingProduct ? editingProduct.purchase_price : newProductForm.purchase_price) || 0;
+                            const s = parseFloat(editingProduct ? (editingProduct.shipping_cost ?? 0) : newProductForm.shipping_cost) || 0;
+                            const l = parseFloat(editingProduct ? (editingProduct.local_cost ?? 0) : newProductForm.local_cost) || 0;
+                            return (p + s + l).toFixed(2);
+                          })()}{" "}
+                          AED
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Selling Price (AED) *</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          required
+                          placeholder="e.g. 35.00"
+                          value={editingProduct ? editingProduct.selling_price : newProductForm.selling_price}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            if (editingProduct) {
+                              setEditingProduct(prev => prev ? { ...prev, selling_price: val } : null);
+                            } else {
+                              setNewProductForm(prev => ({ ...prev, selling_price: val }));
+                            }
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-mono font-bold focus:ring-1 focus:ring-blue-500/20 transition"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Corporate Catalog Notes</label>
+                      <textarea
+                        placeholder="Product packaging, batch constraints..."
+                        rows={2}
+                        value={editingProduct ? editingProduct.notes || "" : newProductForm.notes || ""}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (editingProduct) {
+                            setEditingProduct(prev => prev ? { ...prev, notes: val } : null);
+                          } else {
+                            setNewProductForm(prev => ({ ...prev, notes: val }));
+                          }
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-700 focus:bg-white focus:ring-1 focus:ring-blue-500/20 transition"
+                      />
+                    </div>
+
+                    {/* Form actions */}
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProductModalOpen(false);
+                          setEditingProduct(null);
+                        }}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-extrabold shadow-sm transition"
+                      >
+                        {editingProduct ? "Save Changes" : "Create Product"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
 
           </div>
         )}
@@ -3190,21 +3105,21 @@ export default function App() {
             <div className="pt-6 border-t border-slate-100">
               <h4 className="text-xs font-bold text-slate-900 mb-2.5 flex items-center gap-1.5 uppercase tracking-wide">
                 <Tag className="w-4 h-4 text-amber-500" />
-                <span>تكاليف منتجات الشحنة (Product Costs Configurations)</span>
+                <span>Product Costs Configurations</span>
               </h4>
               <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
-                حدد التكاليف الفردية لكل منتج لهذه الشحنة. سيتم عرض التكلفة الكلية (Total Loaded Cost) لمتابعة الكلفة الإجمالية في الشحنة.
+                Configure default cost breakdown metrics for each catalog item in this batch. The aggregated totals will automatically propagate as dynamic weight per batch component.
               </p>
 
               <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/20">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold">
-                      <th className="py-2.5 px-3">المنتج (Product)</th>
-                      <th className="py-2.5 px-3">سعر الشراء (Unit Purchase - AED)</th>
-                      <th className="py-2.5 px-3">سعر الشحن (Freight Unit Cost)</th>
-                      <th className="py-2.5 px-3">جمارك ونثريات (Custom Jars Toll)</th>
-                      <th className="py-2.5 px-3 text-right">إجمالي الكلفة (Total Cost)</th>
+                      <th className="py-2.5 px-3">Product Name</th>
+                      <th className="py-2.5 px-3">Unit Purchase Price (AED)</th>
+                      <th className="py-2.5 px-3">Freight Shipping Cost (AED)</th>
+                      <th className="py-2.5 px-3">Local Custom & Sundries (AED)</th>
+                      <th className="py-2.5 px-3 text-right">Total Unit Cost (AED)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3287,6 +3202,122 @@ export default function App() {
                 className="bg-blue-600 text-white hover:bg-blue-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-500/10 transition"
               >
                 {editBatchId ? "Update Stock Batch" : "Save Stock Batch"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal - LEDGER MANUAL POST & EDIT Overlay */}
+      {isLedgerModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in py-10 px-4">
+          <form 
+            onSubmit={saveBalanceEntry} 
+            className="bg-white p-8 rounded-2xl border border-slate-200 w-full max-w-xl shadow-2xl space-y-6 animate-scale-up"
+          >
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
+                <Wallet className="w-5 h-5 text-emerald-600" />
+                <span>{editLedgerId ? `Edit Ledger Entry [${editLedgerId}]` : "Log Manual Transaction"}</span>
+              </span>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setIsLedgerModalOpen(false);
+                  setEditLedgerId(null);
+                }} 
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed font-sans">
+              Inject capital, initial bank seed, or manual adjustments dynamically. Cumulative running balances will automatically reconcile.
+            </p>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Transaction Type *</label>
+              <select
+                value={newBalance.type}
+                onChange={e => setNewBalance(prev => ({ ...prev, type: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition text-slate-800"
+              >
+                <option value="Income">Income (Deposit)</option>
+                <option value="Expense">Expense (Withdrawal)</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Amount (AED) *</label>
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  value={newBalance.amount || ""}
+                  onChange={e => setNewBalance(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-bold focus:bg-white transition text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Post Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={newBalance.date}
+                  onChange={e => setNewBalance(prev => ({ ...prev, date: e.target.value }))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono focus:bg-white transition text-slate-800"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Post Details *</label>
+              <input
+                type="text"
+                placeholder="e.g. Bank credit share payment"
+                value={newBalance.details}
+                onChange={e => setNewBalance(prev => ({ ...prev, details: e.target.value }))}
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:bg-white transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Post Notes</label>
+              <input
+                type="text"
+                placeholder="Internal auditing notes..."
+                value={newBalance.note}
+                onChange={e => setNewBalance(prev => ({ ...prev, note: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:bg-white transition"
+              />
+            </div>
+
+            <div className="pt-6 border-t border-slate-100 flex justify-end gap-3 font-sans">
+              <button
+                type="button"
+                onClick={() => {
+                  setNewBalance({
+                    type: "Income",
+                    details: "",
+                    amount: 0,
+                    note: "",
+                    date: new Date().toISOString().split("T")[0]
+                  });
+                  setEditLedgerId(null);
+                  setIsLedgerModalOpen(false);
+                }}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="bg-emerald-600 text-white hover:bg-emerald-700 px-7 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-emerald-500/10 transition"
+              >
+                {editLedgerId ? "Update Transaction" : "Post Ledger Entry"}
               </button>
             </div>
           </form>
