@@ -302,51 +302,51 @@ export async function initDb(): Promise<boolean> {
         );
       }
 
+      // Ensure the Excel Discrepancy Reconciliation transaction is REMOVED if it exists
+      const checkAdjExists = await client.query("SELECT * FROM balance_transactions WHERE id = 'BAL_RECONCILE'");
+      if (checkAdjExists.rows.length > 0) {
+        console.log("Removing Excel Discrepancy Reconciliation entry from Postgres...");
+        await client.query("DELETE FROM balance_transactions WHERE id = 'BAL_RECONCILE'");
+        
+        // Recalculate balances chronologically inside Postgres
+        const rowsRes = await client.query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
+        let runningBalance = 0;
+        for (const row of rowsRes.rows) {
+          const amt = parseFloat(row.amount);
+          if (row.type === "Income") {
+            runningBalance += amt;
+          } else {
+            runningBalance -= amt;
+          }
+          await client.query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
+        }
+        console.log("Postgres balances successfully recalculated code-wise! New running balance:", runningBalance);
+      }
+
+      // Ensure the self-healing duplicate BATCH 09 expense exists in PostgreSQL to match general ledger
+      const checkExp = await client.query("SELECT * FROM expenses WHERE id = 'EXP34_2'");
+      if (checkExp.rows.length === 0) {
+        console.log("Applying self-healing double BATCH 09 expense entry to Postgres...");
+        await client.query(
+          `INSERT INTO expenses (id, date, type, category, description, amount, payment_method, receipt_reference, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            "EXP34_2",
+            "2026-04-04",
+            "Expense",
+            "Supplies",
+            "BATCH 09 in ajman to mostafa +yasmina",
+            165.00,
+            "Other",
+            "",
+            ""
+          ]
+        );
+      }
+
       console.log("Database table Seeding completed with flying colors!");
     } else {
       console.log(`Database tables already populated with ${count} customers.`);
-    }
-
-    // Ensure the Excel Discrepancy Reconciliation transaction is REMOVED if it exists
-    const checkAdjExists = await client.query("SELECT * FROM balance_transactions WHERE id = 'BAL_RECONCILE'");
-    if (checkAdjExists.rows.length > 0) {
-      console.log("Removing Excel Discrepancy Reconciliation entry from Postgres...");
-      await client.query("DELETE FROM balance_transactions WHERE id = 'BAL_RECONCILE'");
-      
-      // Recalculate balances chronologically inside Postgres
-      const rowsRes = await client.query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
-      let runningBalance = 0;
-      for (const row of rowsRes.rows) {
-        const amt = parseFloat(row.amount);
-        if (row.type === "Income") {
-          runningBalance += amt;
-        } else {
-          runningBalance -= amt;
-        }
-        await client.query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
-      }
-      console.log("Postgres balances successfully recalculated code-wise! New running balance:", runningBalance);
-    }
-
-    // Ensure the self-healing duplicate BATCH 09 expense exists in PostgreSQL to match general ledger
-    const checkExp = await client.query("SELECT * FROM expenses WHERE id = 'EXP34_2'");
-    if (checkExp.rows.length === 0) {
-      console.log("Applying self-healing double BATCH 09 expense entry to Postgres...");
-      await client.query(
-        `INSERT INTO expenses (id, date, type, category, description, amount, payment_method, receipt_reference, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          "EXP34_2",
-          "2026-04-04",
-          "Expense",
-          "Supplies",
-          "BATCH 09 in ajman to mostafa +yasmina",
-          165.00,
-          "Other",
-          "",
-          ""
-        ]
-      );
     }
 
     await refreshProductWeightsMap();

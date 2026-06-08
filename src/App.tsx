@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+// @ts-ignore
+import logoUrl from "./logo.svg";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -1120,7 +1122,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             {/* Custom SVG logo representing physical bait al asal / Honey House logo */}
             <img 
-              src="/src/logo.svg" 
+              src={logoUrl} 
               className="w-12 h-12 flex-shrink-0 drop-shadow-sm select-none" 
               alt="Honey House Logo" 
               referrerPolicy="no-referrer" 
