@@ -178,6 +178,7 @@ export default function App() {
   const [dashTo, setDashTo] = useState("");
 
   const [ordersMonth, setOrdersMonth] = useState("");
+  const [ordersCustomerFilter, setOrdersCustomerFilter] = useState("");
   const [ordersBatch, setOrdersBatch] = useState("all");
   const [ordersDelivery, setOrdersDelivery] = useState("all");
   const [ordersPayment, setOrdersPayment] = useState("all");
@@ -1641,7 +1642,30 @@ export default function App() {
             <div className="space-y-6">
                 
                 {/* Advanced Multi-Filter controls */}
-                <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-5 gap-4 items-end">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-450 uppercase mb-2">Search Customer / ID / Item</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={ordersCustomerFilter}
+                        onChange={e => setOrdersCustomerFilter(e.target.value)}
+                        placeholder="e.g. Ibrahim, Phone, Order ID"
+                        className="w-full bg-[#fafaf9] border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-1 focus:ring-blue-550 focus:border-blue-550 outline-none transition"
+                      />
+                      {ordersCustomerFilter && (
+                        <button
+                          type="button"
+                          onClick={() => setOrdersCustomerFilter("")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-base flex items-center justify-center bg-slate-100 hover:bg-slate-200 w-5 h-5 rounded-full transition"
+                          title="Clear search"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-bold text-slate-450 uppercase mb-2">Month Filter</label>
                     <select
@@ -1730,6 +1754,7 @@ export default function App() {
                     <button
                       onClick={() => {
                         setOrdersMonth("");
+                        setOrdersCustomerFilter("");
                         setOrdersBatch("all");
                         setOrdersDelivery("all");
                         setOrdersPayment("all");
@@ -1764,73 +1789,99 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-150">
-                        {orders.map((item, idx) => {
-                          const isPaid = item["Payment Status"] === "Paid";
-                          const isDelivered = item["Delivery Status"] === "Delivered";
+                        {(() => {
+                          const filtered = orders.filter(item => {
+                            if (!ordersCustomerFilter) return true;
+                            const q = ordersCustomerFilter.toLowerCase().trim();
+                            const oId = (item["Order ID"] || "").toLowerCase();
+                            const pName = (item["Customer Name (Auto)"] || "").toLowerCase();
+                            const pPhone = (item["Customer Phone (Auto)"] || "").toLowerCase();
+                            const prod = (item["Product"] || "").toLowerCase();
+                            const batch = (item["Import Batch ID"] || "").toLowerCase();
+                            return pName.includes(q) || pPhone.includes(q) || oId.includes(q) || prod.includes(q) || batch.includes(q);
+                          });
+                          
+                          if (orders.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={10} className="p-8 text-center text-slate-400 font-medium font-sans">
+                                  No orders found. Set filters or click "New Order" to add a transaction.
+                                </td>
+                              </tr>
+                            );
+                          }
+                          
+                          if (filtered.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={10} className="p-8 text-center text-slate-400 font-medium font-sans">
+                                  No orders found matching the filter criteria. Try clearing search text.
+                                </td>
+                              </tr>
+                            );
+                          }
 
-                          return (
-                            <tr key={idx} className="hover:bg-slate-50/50 transition">
-                              <td className="p-4 font-mono font-bold text-slate-950">{item["Order ID"]}</td>
-                              <td className="p-4 whitespace-nowrap">{item["Order Date"]}</td>
-                              <td className="p-4 font-medium text-slate-900">
-                                <div className="space-y-0.5">
-                                  <p>{item["Customer Name (Auto)"] || "Walk-in Guest"}</p>
-                                  <p className="text-[10px] text-slate-400 font-mono">{item["Customer Phone (Auto)"]}</p>
-                                </div>
-                              </td>
-                              <td className="p-4 font-semibold text-slate-700">{item["Product"]}</td>
-                              <td className="p-4 font-medium font-mono">{item["Quantity"]}</td>
-                              <td className="p-4 font-mono font-semibold text-slate-900">
-                                {formatAED(item["Total Sale"])}
-                              </td>
-                              <td className="p-4 font-mono text-slate-500 whitespace-nowrap">
-                                <div className="space-y-0.5 text-left">
-                                  <p>Unit: <span className="font-semibold text-slate-700">{formatAED(item["Cost Price"])}</span></p>
-                                  <p className="text-[10px] text-slate-400">Total: {formatAED(item["Total Cost"])}</p>
-                                </div>
-                              </td>
-                              <td className="p-4 text-center whitespace-nowrap">
-                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold mr-1.5 ${
-                                  isDelivered ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                                }`}>
-                                  {item["Delivery Status"]}
-                                </span>
-                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                  isPaid ? "bg-blue-50 text-blue-700" : "bg-rose-50 text-rose-700"
-                                }`}>
-                                  {item["Payment Status"]}
-                                </span>
-                              </td>
-                              <td className="p-4 font-mono font-semibold text-slate-500">{item["Import Batch ID"]}</td>
-                              <td className="p-4 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    onClick={() => handleEditClick(item)}
-                                    className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200/60 transition flex items-center gap-1 text-[10px] font-bold"
-                                    title="Edit Order"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                    <span>Edit</span>
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteOrder(item["Order ID"])}
-                                    className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition"
-                                    title="Delete Order"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {orders.length === 0 && (
-                          <tr>
-                            <td colSpan={10} className="p-8 text-center text-slate-400 font-medium font-sans">
-                              No orders found. Set filters or click "New Order" to add a transaction.
-                            </td>
-                          </tr>
-                        )}
+                          return filtered.map((item, idx) => {
+                            const isPaid = item["Payment Status"] === "Paid";
+                            const isDelivered = item["Delivery Status"] === "Delivered";
+
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50/50 transition">
+                                <td className="p-4 font-mono font-bold text-slate-950">{item["Order ID"]}</td>
+                                <td className="p-4 whitespace-nowrap">{item["Order Date"]}</td>
+                                <td className="p-4 font-medium text-slate-900">
+                                  <div className="space-y-0.5">
+                                    <p>{item["Customer Name (Auto)"] || "Walk-in Guest"}</p>
+                                    <p className="text-[10px] text-slate-400 font-mono">{item["Customer Phone (Auto)"]}</p>
+                                  </div>
+                                </td>
+                                <td className="p-4 font-semibold text-slate-700">{item["Product"]}</td>
+                                <td className="p-4 font-medium font-mono">{item["Quantity"]}</td>
+                                <td className="p-4 font-mono font-semibold text-slate-900">
+                                  {formatAED(item["Total Sale"])}
+                                </td>
+                                <td className="p-4 font-mono text-slate-500 whitespace-nowrap">
+                                  <div className="space-y-0.5 text-left">
+                                    <p>Unit: <span className="font-semibold text-slate-700">{formatAED(item["Cost Price"])}</span></p>
+                                    <p className="text-[10px] text-slate-400">Total: {formatAED(item["Total Cost"])}</p>
+                                  </div>
+                                </td>
+                                <td className="p-4 text-center whitespace-nowrap">
+                                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold mr-1.5 ${
+                                    isDelivered ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                                  }`}>
+                                    {item["Delivery Status"]}
+                                  </span>
+                                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                    isPaid ? "bg-blue-50 text-blue-700" : "bg-rose-50 text-rose-700"
+                                  }`}>
+                                    {item["Payment Status"]}
+                                  </span>
+                                </td>
+                                <td className="p-4 font-mono font-semibold text-slate-500">{item["Import Batch ID"]}</td>
+                                <td className="p-4 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => handleEditClick(item)}
+                                      className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200/60 transition flex items-center gap-1 text-[10px] font-bold"
+                                      title="Edit Order"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteOrder(item["Order ID"])}
+                                      className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition"
+                                      title="Delete Order"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
@@ -2263,9 +2314,17 @@ export default function App() {
                       <td className="p-4 font-mono">{c["Customer Phone"]}</td>
                       <td className="p-4">{c["Customer Location"] || "Other"}</td>
                       <td className="p-4">
-                        <span className="bg-slate-100 text-slate-800 border border-slate-200/50 px-2 py-0.5 rounded text-[10px] font-bold">
-                          {c["Order Count"]} orders
-                        </span>
+                        <button
+                          onClick={() => {
+                            setOrdersCustomerFilter(c["Customer Name"]);
+                            handlePageChange("orders");
+                          }}
+                          className="bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-200 px-2.5 py-1 rounded-xl text-[11px] font-bold cursor-pointer transition flex items-center gap-1 active:scale-95 shadow-sm"
+                          title={`View ${c["Customer Name"]}'s orders`}
+                        >
+                          <ShoppingCart className="w-3.5 h-3.5 text-amber-700" />
+                          <span>{c["Order Count"]} orders</span>
+                        </button>
                       </td>
                       <td className="p-4 font-mono font-bold text-slate-900">{formatAED(c["Total Spent"])}</td>
                       <td className="p-4 text-right">

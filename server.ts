@@ -60,12 +60,18 @@ async function startServer() {
     next();
   });
 
-  // Run schema migration & seed database
-  try {
-    await initDb();
-  } catch (err: any) {
-    console.error("Database startup failed. Fallback to Memory will handle interactions.", err.message);
-  }
+  // Run schema migration & seed database in the background to avoid blocking server startup and causing timeouts
+  initDb()
+    .then((success) => {
+      if (success) {
+        console.log("[Honey House Engine] PostgreSQL Database initialized and verified in background!");
+      } else {
+        console.log("[Honey House Engine] Database initialization loaded in Fallback Mock Mode.");
+      }
+    })
+    .catch((err) => {
+      console.error("[Honey House Engine] Background Database initialization error:", err.message);
+    });
 
   /* ==========================================================================
      API ROUTES - PREFIX '/api'

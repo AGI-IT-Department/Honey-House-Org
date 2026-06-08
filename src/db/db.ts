@@ -381,50 +381,51 @@ export async function initDb(): Promise<boolean> {
       console.log(`Database tables already populated with ${count} customers.`);
     }
 
-    // Ensure all target/seeded balance transactions are populated in Postgres
-    console.log("Ensuring all SEED_BALANCE transactions are populated in Postgres...");
-    for (const bal of SEED_BALANCE) {
-      await client.query(
-        "INSERT INTO balance_transactions (id, date, type, details, amount, balance, note) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
-        [bal.id, bal.date, bal.type, bal.details, bal.amount, bal.balance, bal.note]
-      );
-    }
+    // Check if balance_transactions are already populated
+    const checkBalCount = await client.query("SELECT COUNT(*) FROM balance_transactions");
+    const balCount = parseInt(checkBalCount.rows[0].count);
 
-    // ALWAYS calibrate BAL_RECONCILE to make sure the historical ledger ends up with exactly -103 initial balance
-    const checkAdjExists = await client.query("SELECT * FROM balance_transactions WHERE id = 'BAL_RECONCILE'");
-    if (checkAdjExists.rows.length === 0) {
+    if (balCount === 0) {
+      console.log("Ensuring all SEED_BALANCE transactions are populated in Postgres...");
+      // For first time or empty, we seed in parallel
+      const insertPromises = SEED_BALANCE.map(bal =>
+        client.query(
+          "INSERT INTO balance_transactions (id, date, type, details, amount, balance, note) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
+          [bal.id, bal.date, bal.type, bal.details, bal.amount, bal.balance, bal.note]
+        )
+      );
+      await Promise.all(insertPromises);
+
+      // ALWAYS calibrate BAL_RECONCILE to make sure the historical ledger ends up with exactly -103 initial balance
       console.log("Inserting baseline calibration entry to Postgres (BAL_RECONCILE)...");
       await client.query(`
         INSERT INTO balance_transactions (id, date, type, details, amount, balance, note)
         VALUES ('BAL_RECONCILE', '2026-06-07', 'Expense', 'First-time Balance Calibration', 289.00, -103.00, 'Adjustment to align with physical balance of -103')
+        ON CONFLICT (id) DO UPDATE SET
+          date = '2026-06-07',
+          type = 'Expense',
+          details = 'First-time Balance Calibration',
+          amount = 289.00,
+          balance = -103.00,
+          note = 'Adjustment to align with physical balance of -103'
       `);
-    } else {
-      console.log("Updating baseline calibration entry in Postgres (BAL_RECONCILE)...");
-      await client.query(`
-        UPDATE balance_transactions
-        SET date = '2026-06-07',
-            type = 'Expense',
-            details = 'First-time Balance Calibration',
-            amount = 289.00,
-            balance = -103.00,
-            note = 'Adjustment to align with physical balance of -103'
-        WHERE id = 'BAL_RECONCILE'
-      `);
-    }
 
-    // Always sort chronologically and recalculate balances in Postgres so everything is accurate and beautifully aligned
-    const rowsRes = await client.query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
-    let runningBalance = 0;
-    for (const row of rowsRes.rows) {
-      const amt = parseFloat(row.amount);
-      if (row.type === "Income") {
-        runningBalance += amt;
-      } else {
-        runningBalance -= amt;
+      // Always sort chronologically and recalculate balances in Postgres so everything is accurate and beautifully aligned
+      const rowsRes = await client.query("SELECT id, type, amount FROM balance_transactions ORDER BY date ASC, id ASC");
+      let runningBalance = 0;
+      for (const row of rowsRes.rows) {
+        const amt = parseFloat(row.amount);
+        if (row.type === "Income") {
+          runningBalance += amt;
+        } else {
+          runningBalance -= amt;
+        }
+        await client.query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
       }
-      await client.query("UPDATE balance_transactions SET balance = $1 WHERE id = $2", [runningBalance, row.id]);
+      console.log("Postgres balances successfully recalculated code-wise! New running balance:", runningBalance);
+    } else {
+      console.log(`Database balance_transactions table already has ${balCount} entries. Skipping seeding and balance recalculation for optimal rapid boot!`);
     }
-    console.log("Postgres balances successfully recalculated code-wise! New running balance:", runningBalance);
 
     // Also update in-memory fallback
     const mockRecIndex = memBalance.findIndex(b => b.id === "BAL_RECONCILE");
