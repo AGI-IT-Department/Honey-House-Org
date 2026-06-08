@@ -827,6 +827,8 @@ export default function App() {
         setOrdersTab("view");
         fetchOrders();
         fetchDashboardData();
+        fetchStaticConfig();
+        fetchBatches();
       } else {
         showToast(`Transaction declined: ${data.error || "unknown DB error."}`, "danger");
       }
@@ -844,6 +846,8 @@ export default function App() {
         showToast(`Order ${id} removed and dynamic stock restored!`, "success");
         fetchOrders();
         fetchDashboardData();
+        fetchStaticConfig();
+        fetchBatches();
       } else {
         showToast(`Delete failed: ${data.error}`, "danger");
       }

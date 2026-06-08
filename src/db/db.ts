@@ -739,15 +739,18 @@ export async function getBatches(startDate?: string, endDate?: string): Promise<
           const sCost = matchedItem ? parseFloat(matchedItem.shipping_cost) : 0;
           const lCost = matchedItem ? parseFloat(matchedItem.local_cost) : 0;
           const totalCostPr = matchedItem ? parseFloat(matchedItem.total_cost_per_product) : (pPrice + sCost + lCost);
+          const prodQty = matchedItem ? parseInt(matchedItem.quantity) : 0;
+          const prodWeight = matchedItem ? parseFloat(matchedItem.total_weight_kg) : 0.0;
+          const prodAvWeight = matchedItem ? parseFloat(matchedItem.available_weight_kg) : 0.0;
           return {
             Product: p.name,
-            Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
+            Quantity: prodQty,
             "Purchase Price": pPrice,
             "Shipping Cost": sCost,
             "Local Cost": lCost,
             "Total Cost per product": totalCostPr,
-            "Product Weight": totalWeight,
-            "Available Weight": availableWeight
+            "Product Weight": prodWeight,
+            "Available Weight": prodAvWeight
           };
         });
 
@@ -796,15 +799,20 @@ export async function getBatches(startDate?: string, endDate?: string): Promise<
       const sCost = matched ? (matched.shippingCost ?? matched.shippingPrice ?? matched["Shipping Cost"] ?? 0) : 0;
       const lCost = matched ? (matched.localCost ?? matched["Local Cost"] ?? 0) : 0;
       const totalCostPr = matched ? (matched.totalCost ?? matched["Total Cost per product"] ?? (pPrice + sCost + lCost)) : (pPrice + sCost + lCost);
+      const prodQty = matched ? (matched.quantity ?? matched.Quantity ?? 0) : 0;
+      const prodWeight = weightUnit > 0 ? (prodQty * weightUnit / 1000) : 0.0;
+      const prodOrders = memOrders.filter(ord => ord.batchId === batchId && ord.productName === p.name);
+      const prodConsumed = prodOrders.reduce((sum, o) => sum + (weightUnit * o.quantity / 1000), 0);
+      const prodAvailableWeight = Math.max(0, prodWeight - prodConsumed);
       return {
         Product: p.name,
-        Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
+        Quantity: prodQty,
         "Purchase Price": pPrice,
         "Shipping Cost": sCost,
         "Local Cost": lCost,
         "Total Cost per product": totalCostPr,
-        "Product Weight": totalWeight,
-        "Available Weight": availableWeight
+        "Product Weight": prodWeight,
+        "Available Weight": prodAvailableWeight
       };
     });
 
@@ -878,15 +886,18 @@ export async function getBatchById(batchId: string): Promise<any | null> {
         const sCost = matchedItem ? parseFloat(matchedItem.shipping_cost) : 0;
         const lCost = matchedItem ? parseFloat(matchedItem.local_cost) : 0;
         const totalCostPr = matchedItem ? parseFloat(matchedItem.total_cost_per_product) : (pPrice + sCost + lCost);
+        const prodQty = matchedItem ? parseInt(matchedItem.quantity) : 0;
+        const prodWeight = matchedItem ? parseFloat(matchedItem.total_weight_kg) : 0.0;
+        const prodAvWeight = matchedItem ? parseFloat(matchedItem.available_weight_kg) : 0.0;
         return {
           Product: p.name,
-          Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
+          Quantity: prodQty,
           "Purchase Price": pPrice,
           "Shipping Cost": sCost,
           "Local Cost": lCost,
           "Total Cost per product": totalCostPr,
-          "Product Weight": totalWeight,
-          "Available Weight": availableWeight
+          "Product Weight": prodWeight,
+          "Available Weight": prodAvWeight
         };
       });
 
@@ -923,15 +934,20 @@ export async function getBatchById(batchId: string): Promise<any | null> {
     const sCost = matched ? (matched.shippingCost ?? matched.shippingPrice ?? matched["Shipping Cost"] ?? 0) : 0;
     const lCost = matched ? (matched.localCost ?? matched["Local Cost"] ?? 0) : 0;
     const totalCostPr = matched ? (matched.totalCost ?? matched["Total Cost per product"] ?? (pPrice + sCost + lCost)) : (pPrice + sCost + lCost);
+    const prodQty = matched ? (matched.quantity ?? matched.Quantity ?? 0) : 0;
+    const prodWeight = weightUnit > 0 ? (prodQty * weightUnit / 1000) : 0.0;
+    const prodOrders = memOrders.filter(ord => ord.batchId === b.id && ord.productName === p.name);
+    const prodConsumed = prodOrders.reduce((sum, o) => sum + (weightUnit * o.quantity / 1000), 0);
+    const prodAvailableWeight = Math.max(0, prodWeight - prodConsumed);
     return {
       Product: p.name,
-      Quantity: weightUnit > 0 ? Math.floor((totalWeight * 1000) / weightUnit) : 999,
+      Quantity: prodQty,
       "Purchase Price": pPrice,
       "Shipping Cost": sCost,
       "Local Cost": lCost,
       "Total Cost per product": totalCostPr,
-      "Product Weight": totalWeight,
-      "Available Weight": availableWeight
+      "Product Weight": prodWeight,
+      "Available Weight": prodAvailableWeight
     };
   });
 
@@ -2356,16 +2372,66 @@ export async function getDashboardData(
     totalImportedWeight += b["Total Weight"] || 0;
   }
 
+  // Pull all orders UNFILTERED by dates to compute robust physical stock weight metrics
+  let allTimeWastedWeight = 0;
+  let allTimeFreeSamplesWeight = 0;
+  let allTimeSoldWeight = 0;
+
+  let allTimeNewWastedWeight = 0;
+  let allTimeNewFreeSamplesWeight = 0;
+  let allTimeNewSoldWeight = 0;
+
+  const allOrdersForWeight = await getOrders(undefined, undefined, batchId);
+  for (const item of allOrdersForWeight) {
+    const isPaid = item["Payment Status"] === "Paid";
+    const qty = item["Quantity"] || 0;
+    const pName = item["Product"] || "";
+    const notesStr = (item["Notes"] || "").toLowerCase();
+    const sale = item["Total Sale"] || 0;
+
+    const itemWeightGrams = PRODUCT_WEIGHTS[pName] || 0;
+    const itemWeightKG = (itemWeightGrams * qty) / 1000;
+
+    if (isPaid) {
+      allTimeSoldWeight += itemWeightKG;
+    }
+
+    let isWastedLoc = false;
+    if (item["Customer ID"] === "CUST0001" || item["Customer ID"] === "CUST0002") {
+      allTimeWastedWeight += itemWeightKG;
+      isWastedLoc = true;
+    }
+
+    const isFreeSample = (item["Unit Price"] === 0 && sale === 0) || 
+                         notesStr.includes("sample") || 
+                         (notesStr.includes("free") && !notesStr.includes("wasted"));
+    if (isFreeSample && (item["Customer ID"] !== "CUST0001" && item["Customer ID"] !== "CUST0002")) {
+      allTimeFreeSamplesWeight += itemWeightKG;
+    }
+
+    const oId = item["Order ID"] || "";
+    const isSeedOrder = seedOrderIds.has(oId);
+    if (!isSeedOrder && isPaid) {
+      if (isWastedLoc) {
+        allTimeNewWastedWeight += itemWeightKG;
+      } else if (isFreeSample) {
+        allTimeNewFreeSamplesWeight += itemWeightKG;
+      } else {
+        allTimeNewSoldWeight += itemWeightKG;
+      }
+    }
+  }
+
   // Calculate dynamic stock remainder matching imports minus outflows with custom calibration
   const isAllBatches = !batchId || batchId === "all";
 
   const finalImportedWeight = isAllBatches ? (185.00 + newImportedWeight) : totalImportedWeight;
-  const finalWastedWeight = isAllBatches ? (10.25 + newWastedWeight) : wastedWeight;
-  const finalFreeSamplesWeight = isAllBatches ? (5.00 + newFreeSamplesWeight) : freeSamplesWeight;
+  const finalWastedWeight = isAllBatches ? (10.25 + allTimeNewWastedWeight) : allTimeWastedWeight;
+  const finalFreeSamplesWeight = isAllBatches ? (5.00 + allTimeNewFreeSamplesWeight) : allTimeFreeSamplesWeight;
   const finalWastedAndSampleWeight = finalWastedWeight + finalFreeSamplesWeight;
   
   // Dynamic total weight sold (excluding wastes and free samples)
-  const finalWeightKG = isAllBatches ? (109.75 + newSoldWeight) : (totalWeightKG - (wastedWeight + freeSamplesWeight));
+  const finalWeightKG = isAllBatches ? (109.75 + allTimeNewSoldWeight) : (allTimeSoldWeight - (allTimeWastedWeight + allTimeFreeSamplesWeight));
   const availableWeightTotal = Math.max(0, finalImportedWeight - finalWeightKG - finalWastedAndSampleWeight);
 
   const balanceStatsValue = await getBalanceStatistics();
