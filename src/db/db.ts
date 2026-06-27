@@ -1038,7 +1038,30 @@ export async function getBatchById(batchId: string): Promise<any | null> {
 }
 
 export async function createBatch(batchData: any): Promise<any> {
-  const batchId = batchData.batchId || "BATCH" + String(memBatches.length + 1).padStart(2, "0");
+  let batchId = batchData.batchId;
+  if (!batchId) {
+    if (usePostgres) {
+      try {
+        const idRes = await query("SELECT id FROM batches WHERE id LIKE 'BATCH%'");
+        const ids = idRes.rows.map(r => r.id);
+        let maxNum = 0;
+        for (const id of ids) {
+          const m = id.match(/^BATCH(\d+)$/i);
+          if (m) {
+            const num = parseInt(m[1], 10);
+            if (num > maxNum) {
+              maxNum = num;
+            }
+          }
+        }
+        batchId = "BATCH" + String(maxNum + 1).padStart(2, "0");
+      } catch (e) {
+        batchId = "BATCH" + String(memBatches.length + 1).padStart(2, "0");
+      }
+    } else {
+      batchId = "BATCH" + String(memBatches.length + 1).padStart(2, "0");
+    }
+  }
   const tWt = parseFloat(batchData.totalWeight) || 0.0;
 
   if (usePostgres) {
@@ -1824,7 +1847,30 @@ export async function getExpenseById(expenseId: string): Promise<any | null> {
 }
 
 export async function createExpense(expenseData: any): Promise<any> {
-  const expenseId = expenseData.expenseId || "EXP" + String(memExpenses.length + 1).padStart(4, "0");
+  let expenseId = expenseData.expenseId;
+  if (!expenseId) {
+    if (usePostgres) {
+      try {
+        const idRes = await query("SELECT id FROM expenses WHERE id LIKE 'EXP%'");
+        const ids = idRes.rows.map(r => r.id);
+        let maxNum = 0;
+        for (const id of ids) {
+          const m = id.match(/^EXP(\d+)$/i);
+          if (m) {
+            const num = parseInt(m[1], 10);
+            if (num > maxNum) {
+              maxNum = num;
+            }
+          }
+        }
+        expenseId = "EXP" + String(maxNum + 1).padStart(4, "0");
+      } catch (e) {
+        expenseId = "EXP" + String(memExpenses.length + 1).padStart(4, "0");
+      }
+    } else {
+      expenseId = "EXP" + String(memExpenses.length + 1).padStart(4, "0");
+    }
+  }
 
   if (usePostgres) {
     try {
