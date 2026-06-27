@@ -22,7 +22,8 @@ import {
   Scale,
   Edit2,
   Tag,
-  ShoppingBag
+  ShoppingBag,
+  Copy
 } from "lucide-react";
 
 // Product weight mapping in grams for frontend UI calculation
@@ -725,6 +726,35 @@ export default function App() {
       products: productsList
     });
     setEditBatchId(batch["Import Batch ID"]);
+    setIsBatchModalOpen(true);
+  };
+
+  const handleDuplicateBatchClick = (batch: any) => {
+    const existingProducts = batch.Products || [];
+    const productsList = (productsCatalog || []).map((p: any) => {
+      const existing = existingProducts.find((ep: any) => ep.Product === p.name);
+      return {
+        productName: p.name,
+        purchasePrice: existing ? existing["Purchase Price"] : p.purchase_price,
+        shippingCost: existing ? existing["Shipping Cost"] : 0,
+        localCost: existing ? existing["Local Cost"] : 0,
+        totalCost: existing ? existing["Total Cost per product"] : p.purchase_price
+      };
+    });
+
+    setNewBatch({
+      name: batch.Name || "",
+      egyPhone: batch["EGY Phone"] || "",
+      uaePhone: batch["UAE Phone"] || "",
+      passportNumber: batch["Passport Number"] || "",
+      locationInEgypt: batch["Location in Egypt"] || "",
+      flightDetails: batch["Flight Dep/Des"] || "",
+      arrivalDate: batch["Arrival Date (UAE)"] || new Date().toISOString().split("T")[0],
+      notes: batch.Notes || "",
+      totalWeight: batch["Total Weight"] || 15.0,
+      products: productsList
+    });
+    setEditBatchId(null); // Create a brand new batch, so ID is generated
     setIsBatchModalOpen(true);
   };
 
@@ -1987,6 +2017,13 @@ export default function App() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleDuplicateBatchClick(batch)}
+                            className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/50 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Duplicate Batch</span>
+                          </button>
                           <button
                             onClick={() => handleEditBatchClick(batch)}
                             className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/50 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
