@@ -275,6 +275,8 @@ export default function App() {
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
   const [editLedgerId, setEditLedgerId] = useState<string | null>(null);
   const [customerSearchDropdown, setCustomerSearchDropdown] = useState<any[]>([]);
+  const [travelers, setTravelers] = useState<any[]>([]);
+  const [showTravelerDropdown, setShowTravelerDropdown] = useState(false);
 
   // Available months cache
   const [monthsList, setMonthsList] = useState<string[]>([]);
@@ -347,6 +349,16 @@ export default function App() {
       setBatches(arr);
     } catch (e) {
       showToast("Error retrieving import batches.", "danger");
+    }
+  };
+
+  const fetchTravelers = async () => {
+    try {
+      const res = await fetch("/api/travelers");
+      const arr = await res.json();
+      setTravelers(arr);
+    } catch (e) {
+      console.error("Error retrieving travelers list:", e);
     }
   };
 
@@ -698,6 +710,7 @@ export default function App() {
     });
     setEditBatchId(null);
     setIsBatchModalOpen(true);
+    fetchTravelers();
   };
 
   const handleEditBatchClick = (batch: any) => {
@@ -727,6 +740,7 @@ export default function App() {
     });
     setEditBatchId(batch["Import Batch ID"]);
     setIsBatchModalOpen(true);
+    fetchTravelers();
   };
 
   const handleDuplicateBatchClick = (batch: any) => {
@@ -756,6 +770,7 @@ export default function App() {
     });
     setEditBatchId(null); // Create a brand new batch, so ID is generated
     setIsBatchModalOpen(true);
+    fetchTravelers();
   };
 
   const handleEditClick = async (clickedItem: OrderItem) => {
@@ -3126,17 +3141,117 @@ export default function App() {
               </button>
             </div>
 
+            {travelers.length > 0 && (
+              <div className="bg-slate-50/50 rounded-xl p-3.5 border border-slate-150 flex flex-col gap-2 font-sans">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                  <span>Quick Fill from Registered Carriers / Travelers:</span>
+                </span>
+                <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                  {travelers.map((t, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setNewBatch(prev => ({
+                          ...prev,
+                          name: t.name,
+                          egyPhone: t.egyPhone || "",
+                          uaePhone: t.uaePhone || "",
+                          passportNumber: t.passportNumber || "",
+                          locationInEgypt: t.locationEgypt || "",
+                          flightDetails: t.flightDetails || ""
+                        }));
+                        setShowTravelerDropdown(false);
+                        showToast(`Loaded details for ${t.name}`, "success");
+                      }}
+                      className="bg-white hover:bg-blue-55 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow-xs"
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Carrier Name *</label>
+              <div className="relative">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 flex justify-between items-center">
+                  <span>Carrier Name *</span>
+                  {travelers.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTravelerDropdown(!showTravelerDropdown)}
+                      className="text-[10px] text-blue-600 font-bold hover:underline"
+                    >
+                      {showTravelerDropdown ? "Hide dropdown" : "Search options"}
+                    </button>
+                  )}
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Bassam Mohamed"
                   value={newBatch.name}
-                  onChange={e => setNewBatch(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={e => {
+                    setNewBatch(prev => ({ ...prev, name: e.target.value }));
+                    setShowTravelerDropdown(true);
+                  }}
+                  onFocus={() => setShowTravelerDropdown(true)}
                   required
                   className="w-full bg-slate-50/55 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold focus:bg-white transition text-slate-800"
                 />
+
+                {/* Autocomplete Suggestions */}
+                {showTravelerDropdown && travelers.length > 0 && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowTravelerDropdown(false)}
+                    />
+                    <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100">
+                      {(() => {
+                        const q = (newBatch.name || "").toLowerCase();
+                        const filtered = travelers.filter(t =>
+                          (t.name || "").toLowerCase().includes(q) ||
+                          (t.egyPhone || "").includes(q) ||
+                          (t.uaePhone || "").includes(q)
+                        );
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="p-3 text-xs text-slate-400 text-center font-sans">
+                              No matching traveler found. Type or enter manually.
+                            </div>
+                          );
+                        }
+                        return filtered.map((t, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-xs text-slate-700 font-sans flex flex-col transition"
+                            onClick={() => {
+                              setNewBatch(prev => ({
+                                ...prev,
+                                name: t.name,
+                                egyPhone: t.egyPhone || "",
+                                uaePhone: t.uaePhone || "",
+                                passportNumber: t.passportNumber || "",
+                                locationInEgypt: t.locationEgypt || "",
+                                flightDetails: t.flightDetails || ""
+                              }));
+                              setShowTravelerDropdown(false);
+                              showToast(`Loaded details for ${t.name}`, "success");
+                            }}
+                          >
+                            <span className="font-bold text-slate-900">{t.name}</span>
+                            <span className="text-[10px] text-slate-500 mt-0.5">
+                              {t.uaePhone ? `UAE: ${t.uaePhone}` : ""} {t.egyPhone ? `| EGY: ${t.egyPhone}` : ""} {t.passportNumber ? `| Passport: ${t.passportNumber}` : ""}
+                            </span>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  </>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">EGY Contact Phone</label>

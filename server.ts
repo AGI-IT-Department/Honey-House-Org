@@ -18,6 +18,7 @@ import {
   updateBatch,
   deleteBatch,
   getBatchIdsWithStatus,
+  getTravelers,
   getActiveProductsFromBatch,
   getProductsForNewOrder,
   getOrders,
@@ -206,6 +207,15 @@ async function startServer() {
   app.get("/api/batches/products/new-order", async (req, res) => {
     try {
       const list = await getProductsForNewOrder();
+      res.json(list);
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get("/api/travelers", async (req, res) => {
+    try {
+      const list = await getTravelers();
       res.json(list);
     } catch (e: any) {
       res.status(500).json({ success: false, error: e.message });

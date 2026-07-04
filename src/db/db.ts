@@ -1256,6 +1256,52 @@ export async function getBatchIdsWithStatus(): Promise<any[]> {
   }));
 }
 
+export async function getTravelers(): Promise<any[]> {
+  if (usePostgres) {
+    try {
+      const res = await query(`
+        SELECT DISTINCT ON (LOWER(TRIM(name)))
+          name,
+          egy_phone AS "egyPhone",
+          uae_phone AS "uaePhone",
+          passport_number AS "passportNumber",
+          location_egypt AS "locationEgypt",
+          flight_details AS "flightDetails"
+        FROM batches
+        ORDER BY LOWER(TRIM(name)), arrival_date DESC
+      `);
+      return res.rows;
+    } catch (e) {
+      console.error("Error in getTravelers with Postgres, falling back to in-memory:", e);
+    }
+  }
+
+  // Fallback for memory list
+  const travelersMap = new Map<string, any>();
+  const sortedBatches = [...memBatches].sort((a, b) => {
+    const dA = a.arrivalDate ? new Date(a.arrivalDate).getTime() : 0;
+    const dB = b.arrivalDate ? new Date(b.arrivalDate).getTime() : 0;
+    return dB - dA;
+  });
+
+  for (const b of sortedBatches) {
+    if (!b.name) continue;
+    const nameKey = b.name.trim().toLowerCase();
+    if (!travelersMap.has(nameKey)) {
+      travelersMap.set(nameKey, {
+        name: b.name,
+        egyPhone: b.egyPhone || "",
+        uaePhone: b.uaePhone || "",
+        passportNumber: b.passportNumber || "",
+        locationEgypt: b.locationEgypt || "",
+        flightDetails: b.flightDetails || ""
+      });
+    }
+  }
+
+  return Array.from(travelersMap.values());
+}
+
 export async function getActiveProductsFromBatch(batchId: string): Promise<any[]> {
   const b = await getBatchById(batchId);
   if (!b) return [];
