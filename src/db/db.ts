@@ -426,21 +426,21 @@ export async function initDb(): Promise<boolean> {
       console.log(`Database balance_transactions table already has ${balCount} entries. Skipping seeding.`);
     }
 
-    // Forcefully align batch statuses: ONLY BATCH08, BATCH09, and BATCH10 should be Active; all others are Inactive/Closed
-    console.log("Aligning batch statuses: Only BATCH08, BATCH09, BATCH10 should be Active...");
-    await client.query("UPDATE batches SET status = 'Inactive' WHERE id NOT IN ('BATCH08', 'BATCH09', 'BATCH10')");
+    // Forcefully align batch statuses: BATCH01 to BATCH07 should be Inactive; BATCH08, BATCH09, and BATCH10 should be Active
+    console.log("Aligning batch statuses: Predefined seed batches BATCH01-BATCH07 should be Inactive, while BATCH08-BATCH10 should be Active...");
+    await client.query("UPDATE batches SET status = 'Inactive' WHERE id IN ('BATCH01', 'BATCH02', 'BATCH03', 'BATCH04', 'BATCH05', 'BATCH06', 'BATCH07')");
     await client.query("UPDATE batches SET status = 'Active' WHERE id IN ('BATCH08', 'BATCH09', 'BATCH10')");
-    await client.query("UPDATE batch_items SET status = 'Inactive' WHERE batch_id NOT IN ('BATCH08', 'BATCH09', 'BATCH10')");
+    await client.query("UPDATE batch_items SET status = 'Inactive' WHERE batch_id IN ('BATCH01', 'BATCH02', 'BATCH03', 'BATCH04', 'BATCH05', 'BATCH06', 'BATCH07')");
     await client.query("UPDATE batch_items SET status = 'Active' WHERE batch_id IN ('BATCH08', 'BATCH09', 'BATCH10')");
 
     // Also update in-memory fallback
     memBatches.forEach(b => {
-      if (b.id === 'BATCH08' || b.id === 'BATCH09' || b.id === 'BATCH10') {
-        b.status = 'Active';
-        b.items.forEach(itm => itm.status = 'Active');
-      } else {
+      if (['BATCH01', 'BATCH02', 'BATCH03', 'BATCH04', 'BATCH05', 'BATCH06', 'BATCH07'].includes(b.id)) {
         b.status = 'Inactive';
         b.items.forEach(itm => itm.status = 'Inactive');
+      } else if (['BATCH08', 'BATCH09', 'BATCH10'].includes(b.id)) {
+        b.status = 'Active';
+        b.items.forEach(itm => itm.status = 'Active');
       }
     });
 

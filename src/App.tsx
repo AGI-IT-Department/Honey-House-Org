@@ -277,6 +277,7 @@ export default function App() {
   const [customerSearchDropdown, setCustomerSearchDropdown] = useState<any[]>([]);
   const [travelers, setTravelers] = useState<any[]>([]);
   const [showTravelerDropdown, setShowTravelerDropdown] = useState(false);
+  const [travelerSearch, setTravelerSearch] = useState("");
 
   // Available months cache
   const [monthsList, setMonthsList] = useState<string[]>([]);
@@ -3142,35 +3143,84 @@ export default function App() {
             </div>
 
             {travelers.length > 0 && (
-              <div className="bg-slate-50/50 rounded-xl p-3.5 border border-slate-150 flex flex-col gap-2 font-sans">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                  <span>Quick Fill from Registered Carriers / Travelers:</span>
-                </span>
-                <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
-                  {travelers.map((t, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setNewBatch(prev => ({
-                          ...prev,
-                          name: t.name,
-                          egyPhone: t.egyPhone || "",
-                          uaePhone: t.uaePhone || "",
-                          passportNumber: t.passportNumber || "",
-                          locationInEgypt: t.locationEgypt || "",
-                          flightDetails: t.flightDetails || ""
-                        }));
-                        setShowTravelerDropdown(false);
-                        showToast(`Loaded details for ${t.name}`, "success");
-                      }}
-                      className="bg-white hover:bg-blue-55 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow-xs"
-                    >
-                      {t.name}
-                    </button>
-                  ))}
+              <div className="bg-slate-55 border-2 border-amber-400/30 rounded-xl p-4 flex flex-col gap-3 font-sans shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span>اختر من بيانات المسافرين المسجلين / Registered Carriers list:</span>
+                  </span>
+                  
+                  {/* Real-time search menu for carrier info */}
+                  <div className="relative w-full md:w-64">
+                    <input
+                      type="text"
+                      placeholder="ابحث بالاسم أو الهاتف / Search name or phone..."
+                      value={travelerSearch}
+                      onChange={e => setTravelerSearch(e.target.value)}
+                      className="w-full bg-white border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-300 transition"
+                    />
+                    {travelerSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setTravelerSearch("")}
+                        className="absolute right-2 top-1.5 text-[10px] text-slate-400 hover:text-slate-600 font-bold"
+                      >
+                        مسح
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {(() => {
+                  const q = travelerSearch.toLowerCase().trim();
+                  const filtered = travelers.filter(t =>
+                    (t.name || "").toLowerCase().includes(q) ||
+                    (t.egyPhone || "").includes(q) ||
+                    (t.uaePhone || "").includes(q)
+                  );
+
+                  if (filtered.length === 0) {
+                    return (
+                      <p className="text-xs text-slate-400 text-center py-2 font-medium">
+                        لم يتم العثور على أي مسافر مسجل يطابق هذا البحث.
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto pr-1">
+                      {filtered.map((t, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setNewBatch(prev => ({
+                              ...prev,
+                              name: t.name,
+                              egyPhone: t.egyPhone || "",
+                              uaePhone: t.uaePhone || "",
+                              passportNumber: t.passportNumber || "",
+                              locationInEgypt: t.locationEgypt || "",
+                              flightDetails: t.flightDetails || ""
+                            }));
+                            setShowTravelerDropdown(false);
+                            setTravelerSearch("");
+                            showToast(`تم تحميل بيانات: ${t.name}`, "success");
+                          }}
+                          className="bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1.5"
+                          title={`${t.name} (UAE: ${t.uaePhone || 'None'} / EGY: ${t.egyPhone || 'None'})`}
+                        >
+                          <span className="font-bold">{t.name}</span>
+                          {(t.uaePhone || t.egyPhone) && (
+                            <span className="text-[9px] text-slate-400 font-normal">
+                              ({t.uaePhone || t.egyPhone})
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
