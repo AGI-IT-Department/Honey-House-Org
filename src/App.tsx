@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 // @ts-ignore
 import logoUrl from "./logo.svg";
+const OFFICIAL_LOGO_URL = "https://i.imgur.com/tpBWWTy.jpg";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -23,8 +24,24 @@ import {
   Edit2,
   Tag,
   ShoppingBag,
-  Copy
+  Copy,
+  FileSpreadsheet
 } from "lucide-react";
+import {
+  exportFullReportToExcel,
+  exportOrdersToExcel,
+  exportBatchesToExcel,
+  exportBalanceToExcel,
+  exportCustomersToExcel,
+  exportProductsToExcel
+} from "./utils/excelExport";
+import {
+  normalizeUAEPhone,
+  isValidUAEPhone,
+  formatUAEPhoneInput,
+  getUAEPhoneFeedback,
+  getSearchablePhoneFragment
+} from "./utils/uaePhone";
 
 // Product weight mapping in grams for frontend UI calculation
 const PRODUCT_WEIGHTS: Record<string, number> = {
@@ -284,6 +301,7 @@ export default function App() {
 
   // Database connection status state
   const [dbStatus, setDbStatus] = useState({ usePostgres: false, hasDatabaseUrl: false, dbError: null as string | null });
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   // Trigger toast alert
   const showToast = (message: string, type: "success" | "danger" | "warning" | "info" = "info") => {
@@ -651,7 +669,7 @@ export default function App() {
       ...prev,
       customerId: c["Customer ID"],
       customerName: c["Customer Name"],
-      customerPhone: c["Customer Phone"],
+      customerPhone: normalizeUAEPhone(c["Customer Phone"]),
       customerLocation: c["Customer Location"]
     }));
     setCustomerSearchQuery("");
@@ -814,7 +832,7 @@ export default function App() {
       setNewOrder({
         customerId: clickedItem["Customer ID"],
         customerName: clickedItem["Customer Name (Auto)"],
-        customerPhone: clickedItem["Customer Phone (Auto)"],
+        customerPhone: normalizeUAEPhone(clickedItem["Customer Phone (Auto)"]),
         customerLocation: clickedItem["Customer Location (Auto)"] || "Dubai",
         deliveryStatus: clickedItem["Delivery Status"],
         paymentStatus: clickedItem["Payment Status"],
@@ -835,6 +853,12 @@ export default function App() {
       return;
     }
 
+    const standardizedPhone = normalizeUAEPhone(newOrder.customerPhone);
+    if (!isValidUAEPhone(standardizedPhone)) {
+      showToast("Invalid UAE phone format. Must be +971 followed by 9 digits starting with 5 (e.g. +971568326116).", "warning");
+      return;
+    }
+
     const invalidItem = newOrder.products.find(p => !p.productName || !p.batchId || p.quantity <= 0);
     if (invalidItem) {
       showToast("Please ensure all products, quantities, and Batch IDs are selected.", "warning");
@@ -845,6 +869,7 @@ export default function App() {
 
     const payload = {
       ...newOrder,
+      customerPhone: standardizedPhone,
       customerId: cid
     };
 
@@ -1099,11 +1124,20 @@ export default function App() {
   const saveCustomerChanges = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editCustomerObj) return;
+    const standardizedPhone = normalizeUAEPhone(editCustomerObj["Customer Phone"]);
+    if (!isValidUAEPhone(standardizedPhone)) {
+      showToast("Invalid UAE phone format. Must be +971 followed by 9 digits starting with 5 (e.g. +971568326116).", "warning");
+      return;
+    }
+    const updatedCustomerPayload = {
+      ...editCustomerObj,
+      "Customer Phone": standardizedPhone
+    };
     try {
       const res = await fetch(`/api/customers/${editCustomerObj["Customer ID"]}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editCustomerObj)
+        body: JSON.stringify(updatedCustomerPayload)
       });
       const r = await res.json();
       if (r.success) {
@@ -1134,6 +1168,136 @@ export default function App() {
   } else if (sortPurchaseValue === "lowest") {
     displayedCustomers.sort((a, b) => (a["Total Spent"] || 0) - (b["Total Spent"] || 0));
   }
+
+  // Export current page contents to styled Excel (.xlsx)
+  // On Dashboard: exports a complete Master Multi-Sheet Workbook containing all 6 modules
+  const handleExportExcel = async () => {
+    if (isExportingExcel) return;
+    setIsExportingExcel(true);
+    try {
+      if (page === "dashboard") {
+        if (!dashboard) {
+          showToast("Dashboard data is still loading.", "warning");
+          return;
+        }
+        const [allOrders, allBatches, allBalance, allCustomers, allProducts] = await Promise.all([
+          fetch("/api/orders").then(r => r.json()).catch(() => orders),
+          fetch("/api/batches").then(r => r.json()).catch(() => batches),
+          fetch("/api/balance/transactions").then(r => r.json()).catch(() => balanceTransactions),
+          fetch("/api/customers").then(r => r.json()).catch(() => customers),
+          fetch("/api/products").then(r => r.json()).catch(() => productsCatalog)
+        ]);
+
+        await exportFullReportToExcel({
+          dashboard,
+          dashFilters: {
+            month: dashMonth,
+            from: dashFrom,
+            to: dashTo,
+            batch: dashBatch
+          },
+          orders: Array.isArray(allOrders) ? allOrders : orders,
+          batches: Array.isArray(allBatches) ? allBatches : batches,
+          balanceTransactions: Array.isArray(allBalance) ? allBalance : balanceTransactions,
+          customers: Array.isArray(allCustomers) ? allCustomers : customers,
+          productsCatalog: Array.isArray(allProducts) ? allProducts : productsCatalog
+        });
+        showToast("Full multi-sheet Excel report exported (Dashboard, Orders, Batches, Balance, Customers & Products).", "success");
+        return;
+      }
+
+      if (page === "orders") {
+        const filteredOrders = orders.filter(item => {
+          if (!ordersCustomerFilter) return true;
+          const q = ordersCustomerFilter.toLowerCase().trim();
+          const phoneQ = getSearchablePhoneFragment(ordersCustomerFilter).toLowerCase();
+          const oId = (item["Order ID"] || "").toLowerCase();
+          const pName = (item["Customer Name (Auto)"] || "").toLowerCase();
+          const pPhone = (item["Customer Phone (Auto)"] || "").toLowerCase();
+          const prod = (item["Product"] || "").toLowerCase();
+          const batch = (item["Import Batch ID"] || "").toLowerCase();
+          return (
+            pName.includes(q) ||
+            pPhone.includes(q) ||
+            (phoneQ.length > 0 && pPhone.includes(phoneQ)) ||
+            oId.includes(q) ||
+            prod.includes(q) ||
+            batch.includes(q)
+          );
+        });
+        if (filteredOrders.length === 0) {
+          showToast("No orders available to export.", "warning");
+          return;
+        }
+        await exportOrdersToExcel(filteredOrders, {
+          search: ordersCustomerFilter,
+          month: ordersMonth,
+          from: ordersFrom,
+          to: ordersTo,
+          batch: ordersBatch,
+          delivery: ordersDelivery,
+          payment: ordersPayment
+        });
+        showToast(`Exported ${filteredOrders.length} orders to Excel.`, "success");
+        return;
+      }
+
+      if (page === "batches") {
+        if (batches.length === 0) {
+          showToast("No batches available to export.", "warning");
+          return;
+        }
+        await exportBatchesToExcel(batches, {
+          month: batchMonth,
+          from: batchFrom,
+          to: batchTo
+        });
+        showToast(`Exported ${batches.length} batches and product breakdowns to Excel.`, "success");
+        return;
+      }
+
+      if (page === "balance") {
+        if (balanceTransactions.length === 0) {
+          showToast("No balance transactions available to export.", "warning");
+          return;
+        }
+        await exportBalanceToExcel(balanceTransactions, {
+          month: balMonth,
+          type: balType
+        });
+        showToast(`Exported ${balanceTransactions.length} ledger entries to Excel.`, "success");
+        return;
+      }
+
+      if (page === "customers") {
+        if (displayedCustomers.length === 0) {
+          showToast("No customers available to export.", "warning");
+          return;
+        }
+        await exportCustomersToExcel(displayedCustomers, {
+          search: customerSearchQuery,
+          location: selectedLocation,
+          sort: sortPurchaseValue
+        });
+        showToast(`Exported ${displayedCustomers.length} customers to Excel.`, "success");
+        return;
+      }
+
+      if (page === "products") {
+        if (productsCatalog.length === 0) {
+          showToast("No products in catalog to export.", "warning");
+          return;
+        }
+        await exportProductsToExcel(productsCatalog);
+        showToast(`Exported ${productsCatalog.length} products to Excel.`, "success");
+      }
+    } catch (err) {
+      console.error("Excel export failed:", err);
+      showToast("Failed to generate Excel sheet. Please try again.", "danger");
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen text-slate-900 bg-[#f1f5f9] font-sans antialiased">
@@ -1174,13 +1338,14 @@ export default function App() {
         fixed inset-y-0 left-0 bg-white text-slate-700 flex flex-col flex-shrink-0 border-r border-slate-200 z-50 w-64 transform transition-transform duration-300 md:static md:translate-x-0
         ${menuOpen ? "translate-x-0" : "-translate-x-full md:flex"}
       `}>
-        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-amber-50/15">
+        <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-white">
           <div className="flex items-center gap-3">
-            {/* Custom SVG logo representing physical bait al asal / Honey House logo */}
+            {/* Official UAE Honey House / بيت العسل logo */}
             <img 
-              src={logoUrl} 
-              className="w-12 h-12 flex-shrink-0 drop-shadow-sm select-none" 
-              alt="Honey House Logo" 
+              src={OFFICIAL_LOGO_URL} 
+              onError={e => { e.currentTarget.src = logoUrl; }}
+              className="w-14 h-14 rounded-full object-contain bg-white flex-shrink-0 ring-1 ring-amber-200/80 shadow-sm select-none" 
+              alt="UAE Honey House - بيت العسل Official Logo" 
               referrerPolicy="no-referrer" 
             />
             <div>
@@ -1306,6 +1471,13 @@ export default function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
+            <img
+              src={OFFICIAL_LOGO_URL}
+              onError={e => { e.currentTarget.src = logoUrl; }}
+              alt="UAE Honey House Logo"
+              referrerPolicy="no-referrer"
+              className="md:hidden w-10 h-10 rounded-full object-contain bg-white ring-1 ring-amber-200/80 shadow-xs flex-shrink-0 select-none"
+            />
             <div>
               <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight capitalize">
                 {page === "dashboard" ? "Business Intelligence Dashboard" : `${page} modules`}
@@ -1316,10 +1488,30 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 self-end md:self-auto">
+          <div className="flex flex-wrap items-center justify-end gap-2.5 self-end md:self-auto">
             <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200/80 px-3 py-1.5 rounded-full font-mono shadow-sm">
               UTC: {new Date().toISOString().split("T")[0]}
             </span>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={isExportingExcel}
+              className="bg-emerald-50 hover:bg-emerald-100 active:scale-[0.98] disabled:opacity-60 text-emerald-800 border border-emerald-300/90 font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title={
+                page === "dashboard"
+                  ? "Export complete multi-sheet Excel workbook (Dashboard, Orders, Batches, Balance, Customers & Products)"
+                  : `Export ${page} module to styled Excel (.xlsx)`
+              }
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>
+                {isExportingExcel
+                  ? "Exporting..."
+                  : page === "dashboard"
+                  ? "Export Full Excel"
+                  : "Export Excel"}
+              </span>
+            </button>
             {page === "batches" && (
               <button
                 onClick={openAddBatchModal}
@@ -1839,12 +2031,13 @@ export default function App() {
                           const filtered = orders.filter(item => {
                             if (!ordersCustomerFilter) return true;
                             const q = ordersCustomerFilter.toLowerCase().trim();
+                            const phoneQ = getSearchablePhoneFragment(ordersCustomerFilter).toLowerCase();
                             const oId = (item["Order ID"] || "").toLowerCase();
                             const pName = (item["Customer Name (Auto)"] || "").toLowerCase();
                             const pPhone = (item["Customer Phone (Auto)"] || "").toLowerCase();
                             const prod = (item["Product"] || "").toLowerCase();
                             const batch = (item["Import Batch ID"] || "").toLowerCase();
-                            return pName.includes(q) || pPhone.includes(q) || oId.includes(q) || prod.includes(q) || batch.includes(q);
+                            return pName.includes(q) || pPhone.includes(q) || (phoneQ.length > 0 && pPhone.includes(phoneQ)) || oId.includes(q) || prod.includes(q) || batch.includes(q);
                           });
                           
                           if (orders.length === 0) {
@@ -2382,7 +2575,12 @@ export default function App() {
                       <td className="p-4 font-mono font-bold text-slate-900">{formatAED(c["Total Spent"])}</td>
                       <td className="p-4 text-right">
                         <button
-                          onClick={() => setEditCustomerObj(c)}
+                          onClick={() =>
+                            setEditCustomerObj({
+                              ...c,
+                              "Customer Phone": normalizeUAEPhone(c["Customer Phone"])
+                            })
+                          }
                           className="text-slate-400 hover:text-blue-600 p-1.5 rounded transition"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -2795,14 +2993,39 @@ export default function App() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contact Phone *</label>
-                <input
-                  type="text"
-                  value={editCustomerObj["Customer Phone"]}
-                  onChange={e => setEditCustomerObj(prev => prev ? { ...prev, "Customer Phone": e.target.value } : null)}
-                  required
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs font-mono font-semibold focus:ring-1 focus:ring-blue-500"
-                />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contact Phone (UAE Standard) *</label>
+                {(() => {
+                  const fb = getUAEPhoneFeedback(editCustomerObj["Customer Phone"]);
+                  return (
+                    <>
+                      <input
+                        type="tel"
+                        dir="ltr"
+                        placeholder="+971568326116 (or 9 digits e.g. 568326116)"
+                        value={editCustomerObj["Customer Phone"]}
+                        onChange={e =>
+                          setEditCustomerObj(prev =>
+                            prev ? { ...prev, "Customer Phone": formatUAEPhoneInput(e.target.value) } : null
+                          )
+                        }
+                        onBlur={() =>
+                          setEditCustomerObj(prev =>
+                            prev ? { ...prev, "Customer Phone": normalizeUAEPhone(prev["Customer Phone"]) } : null
+                          )
+                        }
+                        required
+                        className={`w-full border rounded-xl px-4 py-2 text-xs font-mono font-semibold focus:ring-1 ${
+                          editCustomerObj["Customer Phone"] && !fb.valid
+                            ? "border-amber-400 focus:ring-amber-500 bg-amber-50/30"
+                            : "border-slate-200 focus:ring-blue-500"
+                        }`}
+                      />
+                      <p className={`text-[10px] mt-1 font-medium ${fb.valid ? "text-emerald-600" : "text-amber-600"}`}>
+                        {fb.hint}
+                      </p>
+                    </>
+                  );
+                })()}
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Emirates Location *</label>
@@ -2919,14 +3142,31 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contact Phone *</label>
-                  <input
-                    type="text"
-                    value={newOrder.customerPhone}
-                    onChange={e => handleNewOrderChange("customerPhone", e.target.value)}
-                    required
-                    className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono font-semibold focus:bg-white transition"
-                  />
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contact Phone (UAE Standard) *</label>
+                  {(() => {
+                    const fb = getUAEPhoneFeedback(newOrder.customerPhone);
+                    return (
+                      <>
+                        <input
+                          type="tel"
+                          dir="ltr"
+                          placeholder="+971568326116 (or 9 digits e.g. 568326116)"
+                          value={newOrder.customerPhone}
+                          onChange={e => handleNewOrderChange("customerPhone", formatUAEPhoneInput(e.target.value))}
+                          onBlur={() => handleNewOrderChange("customerPhone", normalizeUAEPhone(newOrder.customerPhone))}
+                          required
+                          className={`w-full border rounded-xl px-4 py-2.5 text-xs font-mono font-semibold focus:bg-white transition ${
+                            newOrder.customerPhone && !fb.valid
+                              ? "bg-amber-50/40 border-amber-400"
+                              : "bg-slate-50/50 border-slate-200"
+                          }`}
+                        />
+                        <p className={`text-[10px] mt-1 font-medium ${!newOrder.customerPhone ? "text-slate-400" : fb.valid ? "text-emerald-600" : "text-amber-600"}`}>
+                          {fb.hint}
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 

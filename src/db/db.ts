@@ -12,6 +12,7 @@ import {
   ExpenseSeed,
   BalanceSeed
 } from "./seedData.js";
+import { normalizeUAEPhone, getSearchablePhoneFragment } from "../utils/uaePhone.js";
 
 const { Pool } = pg;
 
@@ -41,12 +42,12 @@ export function getDbError(): string | null {
 }
 
 // Global in-memory states (fallback DB)
-let memCustomers: CustomerSeed[] = [...SEED_CUSTOMERS];
+let memCustomers: CustomerSeed[] = SEED_CUSTOMERS.map(c => ({ ...c, phone: normalizeUAEPhone(c.phone) }));
 let memBatches: BatchSeed[] = JSON.parse(JSON.stringify(SEED_BATCHES));
 let memExpenses: ExpenseSeed[] = [...SEED_EXPENSES];
 let memBalance: BalanceSeed[] = [...SEED_BALANCE];
 // Flatten seed orders into list of order items
-let memOrders: OrderSeed[] = [...SEED_ORDERS];
+let memOrders: OrderSeed[] = SEED_ORDERS.map(o => ({ ...o, customerPhone: normalizeUAEPhone(o.customerPhone) }));
 
 export function getPool(): pg.Pool | null {
   if (!pool && process.env.DATABASE_URL) {
@@ -461,6 +462,24 @@ export async function initDb(): Promise<boolean> {
       memBalance.push(mockRecObj);
     }
 
+    // Standardize existing UAE customer phone numbers in PostgreSQL to +9715XXXXXXXX
+    try {
+      const custPhonesRes = await client.query("SELECT id, phone FROM customers WHERE phone IS NOT NULL AND phone <> ''");
+      let normalizedCount = 0;
+      for (const row of custPhonesRes.rows) {
+        const standardized = normalizeUAEPhone(row.phone);
+        if (standardized && standardized !== row.phone) {
+          await client.query("UPDATE customers SET phone = $1 WHERE id = $2", [standardized, row.id]);
+          normalizedCount++;
+        }
+      }
+      if (normalizedCount > 0) {
+        console.log(`Standardized ${normalizedCount} existing UAE customer phone numbers to +9715XXXXXXXX format.`);
+      }
+    } catch (phoneNormErr: any) {
+      console.warn("Skipped existing customer phone normalization:", phoneNormErr.message);
+    }
+
     await refreshProductWeightsMap();
     client.release();
     usePostgres = true;
@@ -543,6 +562,7 @@ export async function getAllCustomers(): Promise<any[]> {
       `);
       return res.rows.map(r => ({
         ...r,
+        "Customer Phone": normalizeUAEPhone(r["Customer Phone"]),
         "Total Spent": parseFloat(r["Total Spent"])
       }));
     } catch (e) {
@@ -560,7 +580,7 @@ export async function getAllCustomers(): Promise<any[]> {
     return {
       "Customer ID": cust.id,
       "Customer Name": cust.name,
-      "Customer Phone": cust.phone,
+      "Customer Phone": normalizeUAEPhone(cust.phone),
       "Customer Location": cust.location,
       "Order Count": orderIds.size,
       "Total Spent": totalSpent
@@ -569,9 +589,11 @@ export async function getAllCustomers(): Promise<any[]> {
 }
 
 export async function searchCustomers(searchTerm: string): Promise<any[]> {
+  const phoneFragment = getSearchablePhoneFragment(searchTerm);
   if (usePostgres) {
     try {
       const cleanSearch = `%${searchTerm}%`;
+      const cleanPhoneSearch = `%${phoneFragment}%`;
       const res = await query(`
         SELECT 
           c.id AS "Customer ID", 
@@ -583,12 +605,13 @@ export async function searchCustomers(searchTerm: string): Promise<any[]> {
         FROM customers c
         LEFT JOIN orders o ON o.customer_id = c.id
         LEFT JOIN order_items oi ON oi.order_id = o.id
-        WHERE c.name ILIKE $1 OR c.phone LIKE $1
+        WHERE c.name ILIKE $1 OR c.phone LIKE $1 OR c.phone LIKE $2
         GROUP BY c.id, c.name, c.phone, c.location
         ORDER BY c.name ASC
-      `, [cleanSearch]);
+      `, [cleanSearch, cleanPhoneSearch]);
       return res.rows.map(r => ({
         ...r,
+        "Customer Phone": normalizeUAEPhone(r["Customer Phone"]),
         "Total Spent": parseFloat(r["Total Spent"])
       }));
     } catch (e) {
@@ -598,7 +621,10 @@ export async function searchCustomers(searchTerm: string): Promise<any[]> {
 
   const queryLower = searchTerm.toLowerCase();
   const matched = memCustomers.filter(
-    c => c.name.toLowerCase().includes(queryLower) || c.phone.includes(searchTerm)
+    c =>
+      c.name.toLowerCase().includes(queryLower) ||
+      c.phone.includes(searchTerm) ||
+      c.phone.includes(phoneFragment)
   );
 
   return matched.map(cust => {
@@ -608,7 +634,7 @@ export async function searchCustomers(searchTerm: string): Promise<any[]> {
     return {
       "Customer ID": cust.id,
       "Customer Name": cust.name,
-      "Customer Phone": cust.phone,
+      "Customer Phone": normalizeUAEPhone(cust.phone),
       "Customer Location": cust.location,
       "Order Count": orderIds.size,
       "Total Spent": totalSpent
@@ -676,6 +702,10 @@ export async function getCustomerById(customerId: string): Promise<any | null> {
 }
 
 export async function updateCustomer(customerId: string, customerData: any): Promise<any> {
+  const normalizedPhone = customerData["Customer Phone"] !== undefined
+    ? normalizeUAEPhone(customerData["Customer Phone"])
+    : undefined;
+
   if (usePostgres) {
     try {
       const res = await query(
@@ -685,7 +715,7 @@ export async function updateCustomer(customerId: string, customerData: any): Pro
              location = COALESCE($3, location) 
          WHERE id = $4 
          RETURNING *`,
-        [customerData["Customer Name"], customerData["Customer Phone"], customerData["Customer Location"], customerId]
+        [customerData["Customer Name"], normalizedPhone, customerData["Customer Location"], customerId]
       );
       return { success: res.rows.length > 0, updatedRows: res.rows.length };
     } catch (err) {
@@ -696,14 +726,14 @@ export async function updateCustomer(customerId: string, customerData: any): Pro
   const idx = memCustomers.findIndex(c => c.id === customerId);
   if (idx !== -1) {
     if (customerData["Customer Name"]) memCustomers[idx].name = customerData["Customer Name"];
-    if (customerData["Customer Phone"]) memCustomers[idx].phone = customerData["Customer Phone"];
+    if (normalizedPhone) memCustomers[idx].phone = normalizedPhone;
     if (customerData["Customer Location"]) memCustomers[idx].location = customerData["Customer Location"];
 
     // Sync redundant details in flat memories
     memOrders.forEach(o => {
       if (o.customerId === customerId) {
         if (customerData["Customer Name"]) o.customerName = customerData["Customer Name"];
-        if (customerData["Customer Phone"]) o.customerPhone = customerData["Customer Phone"];
+        if (normalizedPhone) o.customerPhone = normalizedPhone;
         if (customerData["Customer Location"]) o.customerLocation = customerData["Customer Location"];
       }
     });
@@ -714,6 +744,7 @@ export async function updateCustomer(customerId: string, customerData: any): Pro
 }
 
 export async function ensureCustomer(customer: { id: string; name: string; phone: string; location: string }): Promise<void> {
+  const standardizedPhone = normalizeUAEPhone(customer.phone);
   if (usePostgres) {
     try {
       await query(
@@ -723,7 +754,7 @@ export async function ensureCustomer(customer: { id: string; name: string; phone
             name = EXCLUDED.name, 
             phone = EXCLUDED.phone, 
             location = EXCLUDED.location`,
-        [customer.id, customer.name, customer.phone, customer.location]
+        [customer.id, customer.name, standardizedPhone, customer.location]
       );
       return;
     } catch (e) {
@@ -736,13 +767,13 @@ export async function ensureCustomer(customer: { id: string; name: string; phone
     memCustomers.push({
       id: customer.id,
       name: customer.name,
-      phone: customer.phone,
+      phone: standardizedPhone,
       location: customer.location,
       notes: ""
     });
   } else {
     memCustomers[idx].name = customer.name;
-    memCustomers[idx].phone = customer.phone;
+    memCustomers[idx].phone = standardizedPhone;
     memCustomers[idx].location = customer.location;
   }
 }
@@ -1424,6 +1455,7 @@ export async function getOrders(
       const res = await query(q, params);
       return res.rows.map(item => ({
         ...item,
+        "Customer Phone (Auto)": normalizeUAEPhone(item["Customer Phone (Auto)"]),
         Quantity: parseFloat(item["Quantity"]),
         "Unit Price": parseFloat(item["Unit Price"]),
         "Cost Price": parseFloat(item["Cost Price"]),
@@ -1552,12 +1584,13 @@ export async function getOrderById(orderId: string): Promise<any | null> {
 
 export async function createOrder(orderData: any): Promise<any> {
   const orderId = orderData.orderId || "ORD" + String(Date.now()).substring(8);
+  const standardizedPhone = normalizeUAEPhone(orderData.customerPhone);
   
   // 1. Ensure customer exists first!
   await ensureCustomer({
     id: orderData.customerId,
     name: orderData.customerName,
-    phone: orderData.customerPhone,
+    phone: standardizedPhone,
     location: orderData.customerLocation
   });
 
@@ -1655,7 +1688,7 @@ export async function createOrder(orderData: any): Promise<any> {
       orderDate: orderData.orderDate,
       customerId: orderData.customerId,
       customerName: orderData.customerName,
-      customerPhone: orderData.customerPhone,
+      customerPhone: standardizedPhone,
       customerLocation: orderData.customerLocation,
       productName: prod.productName,
       quantity: qty,
