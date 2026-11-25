@@ -11,10 +11,13 @@
   font-family: var(--font-arabic);
 }
 
+html,
 body {
   font-family: var(--font-sans);
   background-color: #f1f5f9;
   color: #0f172a;
+  overflow-x: clip;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Sleek Interface custom classes */
