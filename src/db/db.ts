@@ -13,6 +13,7 @@ import {
   BalanceSeed
 } from "./seedData.js";
 import { normalizeUAEPhone, getSearchablePhoneFragment } from "../utils/uaePhone.js";
+import { initWeeklyTrackerSchema } from "./weeklyTrackerDb.js";
 
 const { Pool } = pg;
 
@@ -234,6 +235,9 @@ export async function initDb(): Promise<boolean> {
       ALTER TABLE products ADD COLUMN IF NOT EXISTS shipping_cost DECIMAL(10, 2) DEFAULT 0;
       ALTER TABLE products ADD COLUMN IF NOT EXISTS local_cost DECIMAL(10, 2) DEFAULT 0;
     `);
+
+    // Initialize Weekly Honey Inventory & Sales Tracker schema and defaults
+    await initWeeklyTrackerSchema(client);
 
     // Perform database seeding if empty
     const checkCust = await client.query("SELECT COUNT(*) FROM customers");

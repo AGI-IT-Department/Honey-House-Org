@@ -25,7 +25,8 @@ import {
   Tag,
   ShoppingBag,
   Copy,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ClipboardList
 } from "lucide-react";
 import {
   exportFullReportToExcel,
@@ -44,6 +45,7 @@ import {
 } from "./utils/uaePhone";
 import { PWAInstallButton } from "./components/PWAInstallButton";
 import { OfflineIndicator } from "./components/OfflineIndicator";
+import { WeeklyInventoryTracker } from "./components/WeeklyInventoryTracker";
 
 // Product weight mapping in grams for frontend UI calculation
 const PRODUCT_WEIGHTS: Record<string, number> = {
@@ -174,7 +176,8 @@ interface DashboardData {
 }
 
 export default function App() {
-  const [page, setPage] = useState<"dashboard" | "orders" | "batches" | "balance" | "customers" | "products">("dashboard");
+  const [page, setPage] = useState<"dashboard" | "orders" | "batches" | "balance" | "customers" | "products" | "weekly-tracker">("dashboard");
+  const [weeklyTrackerExportTick, setWeeklyTrackerExportTick] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   
   // Dynamic Catalog State
@@ -1292,6 +1295,11 @@ export default function App() {
         }
         await exportProductsToExcel(productsCatalog);
         showToast(`Exported ${productsCatalog.length} products to Excel.`, "success");
+        return;
+      }
+
+      if (page === "weekly-tracker") {
+        setWeeklyTrackerExportTick(t => t + 1);
       }
     } catch (err) {
       console.error("Excel export failed:", err);
@@ -1429,6 +1437,20 @@ export default function App() {
             <Tag className={`w-5 h-5 flex-shrink-0 ${page === "products" ? "text-blue-600" : "text-slate-500"}`} />
             <span>Product Catalog</span>
           </button>
+
+          <div className="pt-2 mt-2 border-t border-slate-100">
+            <button
+              onClick={() => handlePageChange("weekly-tracker")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-sm font-medium ${
+                page === "weekly-tracker"
+                  ? "bg-amber-50 text-amber-800 shadow-sm shadow-amber-500/10 font-semibold"
+                  : "text-slate-600 hover:bg-amber-50/50 hover:text-amber-900"
+              }`}
+            >
+              <ClipboardList className={`w-5 h-5 flex-shrink-0 ${page === "weekly-tracker" ? "text-amber-700" : "text-slate-500"}`} />
+              <span className="truncate">الجرد الأسبوعي</span>
+            </button>
+          </div>
         </nav>
 
         {/* Dynamic status footer in drawer */}
@@ -1486,7 +1508,11 @@ export default function App() {
             />
             <div>
               <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight capitalize">
-                {page === "dashboard" ? "Business Intelligence Dashboard" : `${page} modules`}
+                {page === "dashboard"
+                  ? "Business Intelligence Dashboard"
+                  : page === "weekly-tracker"
+                  ? "Weekly Inventory & Sales Tracker"
+                  : `${page} modules`}
               </h2>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
                 Real-time enterprise metrics for UAE Honey House. Reconciled Local timezone.
@@ -2963,6 +2989,16 @@ export default function App() {
             )}
 
           </div>
+        )}
+
+        {/* ----------------------------------------------------
+           WEEKLY HONEY INVENTORY & SALES TRACKER (ARABIC RTL)
+           ---------------------------------------------------- */}
+        {page === "weekly-tracker" && (
+          <WeeklyInventoryTracker
+            onNotify={showToast}
+            externalExportTrigger={weeklyTrackerExportTick}
+          />
         )}
 
       {/* Modal - CUSTOMER PROFILE EDIT Overlay */}

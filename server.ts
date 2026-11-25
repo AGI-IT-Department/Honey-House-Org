@@ -44,6 +44,15 @@ import {
   isUsingPostgres,
   getDbError
 } from "./src/db/db.js";
+import {
+  getWeeklyTrackerData,
+  createTrackerProduct,
+  updateTrackerProduct,
+  deleteTrackerProduct,
+  createTrackerWeek,
+  updateTrackerWeek,
+  deleteTrackerWeek
+} from "./src/db/weeklyTrackerDb.js";
 
 // Load environment variables
 dotenv.config();
@@ -433,13 +442,94 @@ async function startServer() {
     }
   });
 
+  // 7. Weekly Honey Inventory & Sales Tracker Endpoints
+  app.get("/api/weekly-tracker", async (req, res) => {
+    try {
+      const data = await getWeeklyTrackerData();
+      res.json(data);
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/weekly-tracker/products", async (req, res) => {
+    try {
+      const result = await createTrackerProduct(req.body);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ success: false, error: e.message });
+    }
+  });
+
+  app.put("/api/weekly-tracker/products/:id", async (req, res) => {
+    try {
+      const result = await updateTrackerProduct(req.params.id, req.body);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ success: false, error: e.message });
+    }
+  });
+
+  app.delete("/api/weekly-tracker/products/:id", async (req, res) => {
+    try {
+      const result = await deleteTrackerProduct(req.params.id);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/weekly-tracker/weeks", async (req, res) => {
+    try {
+      const result = await createTrackerWeek(req.body);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ success: false, error: e.message });
+    }
+  });
+
+  app.put("/api/weekly-tracker/weeks/:id", async (req, res) => {
+    try {
+      const result = await updateTrackerWeek(req.params.id, req.body);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ success: false, error: e.message });
+    }
+  });
+
+  app.delete("/api/weekly-tracker/weeks/:id", async (req, res) => {
+    try {
+      const result = await deleteTrackerWeek(req.params.id);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ success: false, error: e.message });
+    }
+  });
+
   /* ==========================================================================
      VITE FRONTEND STATIC AND HMR ROUTING MIDDLEWARE
      ========================================================================== */
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        ws: false,
+      },
+      plugins: [
+        {
+          name: "disable-vite-client-ws",
+          transform(code, id) {
+            if (id.includes("vite/dist/client/client.mjs") || id.endsWith("/@vite/client")) {
+              return code
+                .replace("transport.connect(createHMRHandler(handleMessage));", "/* HMR WebSocket disabled */")
+                .replace("transport.connect(createHMRHandler(handleMessage))", "/* HMR WebSocket disabled */")
+                .replace("this.transport.send(payload)", "Promise.resolve()");
+            }
+          },
+        },
+      ],
       appType: "spa",
     });
     app.use(vite.middlewares);
