@@ -42,6 +42,8 @@ import {
   getUAEPhoneFeedback,
   getSearchablePhoneFragment
 } from "./utils/uaePhone";
+import { PWAInstallButton } from "./components/PWAInstallButton";
+import { OfflineIndicator } from "./components/OfflineIndicator";
 
 // Product weight mapping in grams for frontend UI calculation
 const PRODUCT_WEIGHTS: Record<string, number> = {
@@ -1302,6 +1304,9 @@ export default function App() {
   return (
     <div className="flex min-h-screen text-slate-900 bg-[#f1f5f9] font-sans antialiased">
       
+      {/* Offline Connectivity Indicator */}
+      <OfflineIndicator />
+
       {/* Toast Overlay */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-md w-full">
         {toasts.map(t => (
@@ -1427,7 +1432,8 @@ export default function App() {
         </nav>
 
         {/* Dynamic status footer in drawer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50">
+        <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-3">
+          <PWAInstallButton variant="sidebar" />
           <div className="flex items-center gap-2">
             <div className={`status-pulse animate-pulse ${dbStatus.usePostgres ? "bg-emerald-500" : "bg-rose-500"} w-2.5 h-2.5 rounded-full`}></div>
             <span className="text-xs text-slate-700 font-bold uppercase tracking-wider">
@@ -1492,6 +1498,7 @@ export default function App() {
             <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200/80 px-3 py-1.5 rounded-full font-mono shadow-sm">
               UTC: {new Date().toISOString().split("T")[0]}
             </span>
+            <PWAInstallButton variant="header" />
             <button
               type="button"
               onClick={handleExportExcel}

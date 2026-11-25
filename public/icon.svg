@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb" />
+      <stop offset="100%" stop-color="#fef3c7" />
+    </linearGradient>
+    <linearGradient id="honeyRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <linearGradient id="hiveGold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="55%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Full-bleed rounded-friendly background -->
+  <rect width="512" height="512" rx="96" fill="url(#bgGrad)" />
+
+  <!-- Outer Golden Honey Ring -->
+  <circle cx="256" cy="252" r="192" fill="#ffffff" stroke="url(#honeyRing)" stroke-width="26" />
+  <circle cx="256" cy="252" r="174" fill="none" stroke="#fde68a" stroke-width="5" opacity="0.85" />
+
+  <!-- Golden Honey Drip at bottom -->
+  <path d="M 242 436 Q 256 488 270 436 Z" fill="url(#honeyRing)" />
+  <circle cx="100" cy="364" r="11" fill="#f59e0b" />
+  <circle cx="416" cy="152" r="9" fill="#fbbf24" />
+  <circle cx="114" cy="146" r="7" fill="#fbbf24" />
+
+  <!-- House Frame (Deep Cocoa Brown) -->
+  <path
+    d="M 156 218 L 256 124 L 356 218 M 182 194 L 182 322 L 330 322 L 330 194"
+    fill="none"
+    stroke="#78350f"
+    stroke-width="16"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <!-- Chimney -->
+  <path d="M 304 168 L 304 134 L 326 134 L 326 188" fill="none" stroke="#78350f" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Beehive Inside House -->
+  <g fill="url(#hiveGold)" stroke="#78350f" stroke-width="7" stroke-linejoin="round">
+    <rect x="218" y="182" width="76" height="26" rx="13" />
+    <rect x="200" y="206" width="112" height="28" rx="14" />
+    <rect x="194" y="232" width="124" height="30" rx="15" />
+    <rect x="202" y="260" width="108" height="28" rx="14" />
+    <rect x="216" y="286" width="80" height="24" rx="12" />
+  </g>
+  <!-- Beehive Entrance -->
+  <path d="M 244 310 L 244 286 A 12 12 0 0 1 268 286 L 268 310 Z" fill="#78350f" />
+
+  <!-- Honey Drip under Hive -->
+  <path d="M 206 322 Q 256 340 306 322 Q 294 348 282 332 Q 268 368 256 338 Q 242 362 232 334 Z" fill="#f59e0b" />
+
+  <!-- Cute Bee -->
+  <g transform="translate(342, 238)">
+    <ellipse cx="-8" cy="-18" rx="11" ry="16" fill="#ffffff" stroke="#78350f" stroke-width="5" transform="rotate(-24)" />
+    <ellipse cx="10" cy="-16" rx="9" ry="14" fill="#ffffff" stroke="#78350f" stroke-width="5" transform="rotate(24)" />
+    <ellipse cx="0" cy="0" rx="22" ry="15" fill="#fbbf24" stroke="#78350f" stroke-width="6" />
+    <line x1="-7" y1="-14" x2="-7" y2="14" stroke="#78350f" stroke-width="5" />
+    <line x1="6" y1="-14" x2="6" y2="14" stroke="#78350f" stroke-width="5" />
+  </g>
+
+  <!-- Brand Label (Clean Bold Sans for universal rendering) -->
+  <text x="256" y="392" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-weight="800" font-size="38" fill="#78350f" letter-spacing="1">HONEY HOUSE</text>
+</svg>
